@@ -15,6 +15,8 @@ services:
         ports:
             - '8080:8080'
         volumes:
+            - ${DATASET_DIR-./datasets}:/datasets
+            - /home/mdeboer/workspace/vitaminn:/vitaminn
             - './client:/workspace/client'
         command: 'npm run serve'
         networks:
@@ -29,12 +31,14 @@ services:
         ports:
             - '5000:5000'
         volumes:
-            - './datasets:/datasets'
+            - ${DATASET_DIR-./datasets}:/datasets
             - './app:/workspace/app'
             - './.git:/workspace/.git'
         environment:
           - FLASK_APP=app
           - FLASK_ENV=development
+          - CREATE_CATEGORIES_FROM_FILE=/datasets/categories.json
+          - CREATE_DATASETS_FROM_FILE=/datasets/datasets.json
         command: 'flask run --host=0.0.0.0'
         networks:
             - cocoannotator
