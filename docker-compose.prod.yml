@@ -9,9 +9,7 @@ services:
         ports:
             - '5000:5000'
         volumes:
-            - './datasets:/datasets'
-            - './app:/workspace/app'
-            - './.git:/workspace/.git'
+            - '${DATASETS_DIR-./datasets}:/datasets'
         depends_on:
             - database
     database:

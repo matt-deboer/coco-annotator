@@ -34,5 +34,8 @@ RUN pip install gunicorn
 RUN pip install -r requirements.txt
 RUN pip install pycocotools
 
+COPY app /workspace/app
+COPY .git /workspace/.git
+
 EXPOSE 5000
 CMD gunicorn -w 4 -b 0.0.0.0:5000 app:app --config app/gunicorn_config.py --log-level debug
