@@ -2,14 +2,14 @@ import cv2
 import numpy as np
 
 
-def extract_patch(segmentation, img):
+def extract_cropped_patch(img, mask, bbox):
     """
-    Creates a copy of img where all pixes outside of the segmentation
-    are set to zero 
+    Creates a copy of img whereever the pixels of mask are non-zero,
+    then crops the copy by the provided bbox
     """
-    mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-    mask = cv2.drawContours(mask, segmentation, -1, 255, -1)
-    return cv2.bitwise_and(img, img, mask=mask)
+    patch = cv2.bitwise_and(img, img, mask=mask)
+    x, y, w, h = bbox
+    return patch[y:y + h, x:x + w]
 
 
 def rect_union(a, b):
@@ -25,6 +25,7 @@ def bbox_for_contours(contours):
     for cnt in contours:
         bbox = rect_union(bbox, cv2.boundingRect(cnt))
     return bbox
+
 
 def segmentation_to_contours(segmentation):
     contours = list()
@@ -45,7 +46,15 @@ def segmentation_equal(seg_a, seg_b):
     """
     if len(seg_a) != len(seg_b):
         return False
-    for i in range(len(seg_a)):
+
+    for i, _ in enumerate(seg_a):
+        # remove excess points used for closing the loop
+        if len(seg_a[i]) >= 4:
+            if seg_a[i][0] == seg_a[i][-2] and seg_a[i][1] == seg_a[i][-1]:
+                seg_a[i] = seg_a[i][:-2]
+        if len(seg_b[i]) >= 4:
+            if seg_b[i][0] == seg_b[i][-2] and seg_b[i][1] == seg_b[i][-1]:
+                seg_b[i] = seg_b[i][:-2]
         if len(seg_a[i]) != len(seg_b[i]):
             return False
         for j in range(len(seg_a[i])):
