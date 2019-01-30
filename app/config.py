@@ -33,8 +33,14 @@ class Config:
     AUTOANNOTATOR_DIFF_THRESHOLD = float(
         os.getenv("AUTOANNOTATOR_DIFF_THRESHOLD", 0.0035))
 
+    # Coco Importer Options
+    COCO_IMPORTER_VERBOSE = os.getenv("COCO_IMPORTER_VERBOSE", False)
+    COCO_IMPORTER_MAX_WORKERS = int(os.getenv("COCO_IMPORTER_MAX_WORKERS", 4))
+    COCO_IMPORTER_IMAGE_BATCH_SIZE = int(
+        os.getenv("COCO_IMPORTER_IMAGE_BATCH_SIZE", 1000))
+    COCO_IMPORTER_ANNOTATION_BATCH_SIZE = int(
+        os.getenv("COCO_IMPORTER_ANNOTATION_BATCH_SIZE", 1000))
+
     # User Options
     LOGIN_DISABLED = os.getenv('LOGIN_DISABLED', False)
     ALLOW_REGISTRATION = True
-
-
