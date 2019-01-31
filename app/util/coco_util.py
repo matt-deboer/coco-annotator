@@ -55,16 +55,29 @@ def paperjs_to_coco(image_width, image_height, paperjs):
         if num_widths + num_heights == len(segments_to_add):
             continue
 
-        segments.append(segments_to_add)
+        if len(segments_to_add) == 4:
+            # len 4 means this is a line with no width; it contributes
+            # no area to the mask, and if we include it, coco will treat
+            # it instead as a bbox (and throw an error)
+            continue
+
+        segments.append(np.array(segments_to_add))
 
     if len(segments) < 1:
         return [], 0, [0, 0, 0, 0]
 
+    area, bbox = get_segmentation_area_and_bbox(
+        segments, image_height, image_width)
+
+    return segments, area, bbox
+
+
+def get_segmentation_area_and_bbox(segmentation, image_height, image_width):
     # Convert into rle
-    rles = mask.frPyObjects(segments, image_height, image_width)
+    rles = mask.frPyObjects(segmentation, image_height, image_width)
     rle = mask.merge(rles)
 
-    return segments, mask.area(rle), mask.toBbox(rle)
+    return mask.area(rle), mask.toBbox(rle)
 
 
 def get_annotations_iou(annotation_a, annotation_b):
