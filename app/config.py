@@ -21,6 +21,7 @@ class Config:
     INITIALIZE_FROM_FILE = os.getenv("INITIALIZE_FROM_FILE")
     LOAD_IMAGES_ON_START = os.getenv("LOAD_IMAGES_ON_START", False)
 
+
     # Autoannotator options
     AUTOANNOTATOR_ENABLED = os.getenv("AUTOANNOTATOR_ENABLED", False)
     AUTOANNOTATOR_VERBOSE = os.getenv("AUTOANNOTATOR_VERBOSE", False)
@@ -40,6 +41,12 @@ class Config:
         os.getenv("COCO_IMPORTER_IMAGE_BATCH_SIZE", 1000))
     COCO_IMPORTER_ANNOTATION_BATCH_SIZE = int(
         os.getenv("COCO_IMPORTER_ANNOTATION_BATCH_SIZE", 1000))
+
+    # Autoexporter Options
+    AUTOEXPORTER_ENABLED = os.getenv("AUTOEXPORTER_ENABLED", False)
+    AUTOEXPORTER_VERBOSE = os.getenv("AUTOEXPORTER_VERBOSE", False)
+    AUTOEXPORTER_EXTENSION = os.getenv("AUTOEXPORTER_EXTENSION", ".coco.json")
+
 
     # User Options
     LOGIN_DISABLED = os.getenv('LOGIN_DISABLED', False)

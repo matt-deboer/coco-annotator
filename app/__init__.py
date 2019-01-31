@@ -10,6 +10,7 @@ from .models import *
 from .authentication import login_manager
 from .util import query_util, color_util
 from .util.autoannotator import Autoannotator
+from .util.autoexporter import Autoexporter
 
 import threading
 import requests
@@ -64,6 +65,7 @@ if Config.INITIALIZE_FROM_FILE:
 if Config.LOAD_IMAGES_ON_START:
     ImageModel.load_images(Config.DATASET_DIRECTORY)
 
+
 if Config.AUTOANNOTATOR_ENABLED:
     Autoannotator.start(
         max_workers=Config.AUTOANNOTATOR_MAX_WORKERS,
@@ -71,6 +73,13 @@ if Config.AUTOANNOTATOR_ENABLED:
         max_mismatched=Config.AUTOANNOTATOR_MAX_MISMATCHED,
         diff_threshold=Config.AUTOANNOTATOR_DIFF_THRESHOLD,
         verbose=Config.AUTOANNOTATOR_VERBOSE,
+        logger=app.logger)
+
+
+if Config.AUTOEXPORTER_ENABLED:
+    Autoexporter.start(
+        verbose=Config.AUTOEXPORTER_VERBOSE,
+        extension=Config.AUTOEXPORTER_EXTENSION,
         logger=app.logger)
 
 
