@@ -65,7 +65,6 @@ if Config.INITIALIZE_FROM_FILE:
 if Config.LOAD_IMAGES_ON_START:
     ImageModel.load_images(Config.DATASET_DIRECTORY)
 
-
 if Config.AUTOANNOTATOR_ENABLED:
     Autoannotator.start(
         max_workers=Config.AUTOANNOTATOR_MAX_WORKERS,
@@ -74,7 +73,6 @@ if Config.AUTOANNOTATOR_ENABLED:
         diff_threshold=Config.AUTOANNOTATOR_DIFF_THRESHOLD,
         verbose=Config.AUTOANNOTATOR_VERBOSE,
         logger=app.logger)
-
 
 if Config.AUTOEXPORTER_ENABLED:
     Autoexporter.start(

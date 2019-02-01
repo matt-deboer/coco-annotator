@@ -21,7 +21,6 @@ class Config:
     INITIALIZE_FROM_FILE = os.getenv("INITIALIZE_FROM_FILE")
     LOAD_IMAGES_ON_START = os.getenv("LOAD_IMAGES_ON_START", False)
 
-
     # Autoannotator options
     AUTOANNOTATOR_ENABLED = os.getenv("AUTOANNOTATOR_ENABLED", False)
     AUTOANNOTATOR_VERBOSE = os.getenv("AUTOANNOTATOR_VERBOSE", False)
@@ -46,7 +45,6 @@ class Config:
     AUTOEXPORTER_ENABLED = os.getenv("AUTOEXPORTER_ENABLED", False)
     AUTOEXPORTER_VERBOSE = os.getenv("AUTOEXPORTER_VERBOSE", False)
     AUTOEXPORTER_EXTENSION = os.getenv("AUTOEXPORTER_EXTENSION", ".coco.json")
-
 
     # User Options
     LOGIN_DISABLED = os.getenv('LOGIN_DISABLED', False)
