@@ -7,7 +7,6 @@ from ..util import coco_util
 from ..util.autoannotator import Autoannotator
 from ..util import annotation_util
 from ..models import *
-from ..util.autoexporter import Autoexporter
 
 api = Namespace('annotator', description='Annotator related operations')
 
@@ -109,9 +108,6 @@ class AnnotatorData(Resource):
             set__annotated=annotated,
             set__category_ids=image.get('category_ids', [])
         )
-
-        if Autoexporter.enabled:
-            Autoexporter.submit(image_model)
 
         return data
 
