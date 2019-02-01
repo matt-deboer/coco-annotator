@@ -1,7 +1,6 @@
 import queue
 import os
 import json
-from ..models import ImageModel
 from ..util.coco_util import get_image_coco
 from ..util.concurrency_util import ExceptionLoggingThreadPoolExecutor
 
