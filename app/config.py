@@ -41,6 +41,11 @@ class Config:
     COCO_IMPORTER_ANNOTATION_BATCH_SIZE = int(
         os.getenv("COCO_IMPORTER_ANNOTATION_BATCH_SIZE", 1000))
 
+    # Autoexporter Options
+    AUTOEXPORTER_ENABLED = os.getenv("AUTOEXPORTER_ENABLED", False)
+    AUTOEXPORTER_VERBOSE = os.getenv("AUTOEXPORTER_VERBOSE", False)
+    AUTOEXPORTER_EXTENSION = os.getenv("AUTOEXPORTER_EXTENSION", ".coco.json")
+
     # User Options
     LOGIN_DISABLED = os.getenv('LOGIN_DISABLED', False)
     ALLOW_REGISTRATION = True
