@@ -64,8 +64,26 @@ export default {
         showText: this.hover.showText
       };
     },
-    generateStringFromMetadata() {
+    generateTitle() {
       let string = " ";
+      if (this.hover.category && this.hover.annotation) {
+        let id = this.hover.textId;
+        let category = this.hover.category.category.name
+        string += "ID: " + id + " \n";
+        string += "Category: " + category + " \n";
+      }
+      
+      if (this.$store.getters["user/loginEnabled"]) {
+        let creator = this.hover.annotation.annotation.creator;
+        if (creator != null) {
+          string += "Created by " + creator + "\n\n";
+        }
+      }
+
+      return string.replace(/\n/g, " \n ").slice(0, -2);
+    },
+    generateStringFromMetadata() {
+      let string = "";
       let metadata = this.hover.annotation.$refs.metadata.metadataList;
 
       if (metadata == null || metadata.length === 0) {
@@ -77,13 +95,6 @@ export default {
             string += " " + element.key + " = " + element.value + " \n";
           }
         });
-      }
-
-      if (this.$store.getters["user/loginEnabled"]) {
-        let creator = this.hover.annotation.annotation.creator;
-        if (creator != null) {
-          string += "Created by " + creator + "\n";
-        }
       }
 
       return string.replace(/\n/g, " \n ").slice(0, -2);
@@ -106,7 +117,8 @@ export default {
         }
 
         this.hover.textId = this.hover.annotation.annotation.id;
-        let content = this.generateStringFromMetadata();
+        let content =
+          this.generateTitle() + " \n " + this.generateStringFromMetadata();
 
         this.hover.text = new paper.PointText(position);
         this.hover.text.justification = "left";
