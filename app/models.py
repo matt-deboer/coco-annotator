@@ -13,7 +13,7 @@ from flask_login import UserMixin, current_user
 
 from .config import Config
 from PIL import Image
-
+from .util.autoexporter import Autoexporter
 
 db = MongoEngine()
 
@@ -152,6 +152,11 @@ class ImageModel(db.DynamicDocument):
             clone.save(copy=True)
 
         return annotations.count()
+
+    def update(self, **kwargs):
+        super().update(**kwargs)
+        if Autoexporter.enabled:
+            Autoexporter.submit(self)
 
     def __call__(self):
 
