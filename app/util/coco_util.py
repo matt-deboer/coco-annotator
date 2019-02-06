@@ -1,4 +1,5 @@
 import pycocotools.mask as mask
+import numpy as np
 
 from .query_util import fix_ids
 from ..models import DatasetModel, CategoryModel, AnnotationModel, ImageModel

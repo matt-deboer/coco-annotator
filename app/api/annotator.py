@@ -5,6 +5,7 @@ from flask import request
 from ..util import query_util
 from ..util import coco_util
 from ..util.autoannotator import Autoannotator
+from ..util.autoexporter import Autoexporter
 from ..util import annotation_util
 from ..models import *
 
@@ -108,6 +109,9 @@ class AnnotatorData(Resource):
             set__annotated=annotated,
             set__category_ids=image.get('category_ids', [])
         )
+
+        if Autoexporter.enabled:
+            Autoexporter.submit(image_model)
 
         return data
 

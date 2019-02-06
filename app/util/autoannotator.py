@@ -11,6 +11,7 @@ from ..util.annotation_util import (
 from concurrent.futures import Future, wait
 from ..util.coco_util import get_annotations_iou
 from ..util.concurrency_util import ExceptionLoggingThreadPoolExecutor
+from ..util.autoexporter import Autoexporter
 import sortedcontainers
 from functools import lru_cache
 
@@ -245,6 +246,9 @@ class Autoannotator:
 
             image_to.copy_annotations(
                 AnnotationModel.objects(id__in=annotations_ids_to_copy))
+
+            if Autoexporter.enabled:
+                Autoexporter.submit(image_to)
 
             for to_remove in existing_annotations_replaced:
                 to_remove.delete()
