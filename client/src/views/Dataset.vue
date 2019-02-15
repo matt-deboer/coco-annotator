@@ -61,22 +61,52 @@
           data-toggle="modal"
           data-target="#generateDataset"
         >
-          Generate
+          <div v-if="generate.id != null" class="progress">
+            <div
+              class="progress-bar bg-success"
+              :style="{ 'width': `${generate.progress}%` }"
+            >
+              Generating
+            </div>
+          </div>
+          <div v-else>Generate</div>
         </button>
         <button
           type="button"
           class="btn btn-primary btn-block"
-          data-toggle="modal"
-          data-target="#cocoUpload"
+          @click="importModal"
         >
-          Import COCO
+          <div v-if="importing.id != null" class="progress">
+            <div
+              class="progress-bar bg-primary"
+              :style="{ 'width': `${importing.progress}%` }"
+            >
+              Importing
+            </div>
+          </div>
+          <div v-else>Importing COCO</div>
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-block"
+          @click="createScanTask"
+        >
+          <div v-if="scan.id != null" class="progress">
+            <div
+              class="progress-bar bg-secondary"
+              :style="{ 'width': `${scan.progress}%` }"
+            >
+              Scanning
+            </div>
+          </div>
+          <div v-else>Scan</div>
         </button>
 
         <!-- <button type="button" class="btn btn-info">
           Download COCO
         </button> -->
       </div>
-      <hr />
+      <hr>
       <h6 class="sidebar-title text-center">Subdirectories</h6>
       <div class="sidebar-section" style="max-height: 30%; color: lightgray">
         <div v-if="subdirectories.length > 0">
@@ -94,12 +124,16 @@
           No subdirectory found.
         </p>
       </div>
-      <hr />
+      <hr>
       <h6 class="sidebar-title text-center">Filtering Options</h6>
       <div
         class="sidebar-section"
         style="max-height: 30%; color: lightgray"
-      ></div>
+      >
+        <PanelString name="Contains" v-model="query.file_name__icontains" @submit="updatePage" />
+        <PanelToggle name="Show Annotated" v-model="panel.showAnnotated" />
+        <PanelToggle name="Show Not Annotated" v-model="panel.showNotAnnotated" />
+      </div>
     </div>
 
     <div class="modal fade" tabindex="-1" role="dialog" id="generateDataset">
@@ -177,7 +211,7 @@
             <button
               type="button"
               class="btn btn-primary"
-              @click="uploadCoco"
+              @click="importCOCO"
               data-dismiss="modal"
             >
               Upload
@@ -197,18 +231,25 @@
 </template>
 
 <script>
-import axios from "axios";
-
 import toastrs from "@/mixins/toastrs";
-
+import Dataset from "@/models/datasets";
 import ImageCard from "@/components/cards/ImageCard";
 import Pagination from "@/components/Pagination";
-
+import PanelString from "@/components/PanelInputString";
+import PanelToggle from "@/components/PanelToggle";
+import JQuery from "jquery";
 import { mapMutations } from "vuex";
+
+let $ = JQuery
 
 export default {
   name: "Dataset",
-  components: { ImageCard, Pagination },
+  components: {
+    ImageCard,
+    Pagination,
+    PanelString,
+    PanelToggle
+  },
   mixins: [toastrs],
   props: {
     identifier: {
@@ -237,6 +278,30 @@ export default {
         drag: false,
         width: 300,
         canResize: false
+      },
+      scan: {
+        progress: 0,
+        id: null
+      },
+      generate: {
+        progress: 0,
+        id: null
+      },
+      importing: {
+        progress: 0,
+        id: null
+      },
+      exporting: {
+        progress: 0,
+        id: null
+      },
+      query: {
+        file_name__icontains: "",
+        ...this.$route.query
+      },
+      panel: {
+        showAnnotated: true,
+        showNotAnnotated: true
       }
     };
   },
@@ -244,36 +309,59 @@ export default {
     ...mapMutations(["addProcess", "removeProcess"]),
     generateDataset() {
       if (this.keyword.length === 0) return;
-      axios
-        .post("/api/dataset/" + this.dataset.id + "/generate", {
-          keywords: [this.keyword],
-          limit: this.generateLimit
-        })
-        .then(() => {});
+
+      Dataset.generate(this.dataset.id, {
+        keywords: [this.keyword],
+        limit: this.generateLimit
+      });
     },
     updatePage(page) {
       let process = "Loading images from dataset";
       this.addProcess(process);
 
-      axios
-        .get("/api/dataset/" + this.dataset.id + "/data", {
-          params: {
-            page: page,
-            limit: this.limit,
-            folder: this.folders.join("/")
-          }
-        })
+      Dataset.getData(this.dataset.id, {
+        page: page,
+        limit: this.limit,
+        folder: this.folders.join("/"),
+        ...this.query,
+        annotated: this.queryAnnotated
+      })
         .then(response => {
-          this.images = response.data.images;
-          this.dataset = response.data.dataset;
+          let data = response.data;
 
-          this.imageCount = response.data.pagination.total;
-          this.pages = response.data.pagination.pages;
+          this.images = data.images;
+          this.dataset = data.dataset;
 
-          this.subdirectories = response.data.subdirectories;
+          this.imageCount = data.pagination.total;
+          this.pages = data.pagination.pages;
+
+          this.subdirectories = data.subdirectories;
+          // this.scan.id = data.scanId;
+          // this.generate.id = data.generateId;
+          // this.importing.id = data.importId;
+          // this.exporting.id = data.exportId;
         })
         .catch(error => {
           this.axiosReqestError("Loading Dataset", error.response.data.message);
+        })
+        .finally(() => this.removeProcess(process));
+    },
+    createScanTask() {
+      if (this.scan.id != null) {
+        this.$router.push({ path: "/tasks", query: { id: this.scan.id } });
+        return;
+      }
+
+      Dataset.scan(this.dataset.id)
+        .then(response => {
+          let id = response.data.id;
+          this.scan.id = id;
+        })
+        .catch(error => {
+          this.axiosReqestError(
+            "Scanning Dataset",
+            error.response.data.message
+          );
         })
         .finally(() => this.removeProcess(process));
     },
@@ -281,23 +369,23 @@ export default {
       let index = this.folders.indexOf(folder);
       this.folders.splice(index + 1, this.folders.length);
     },
-    uploadCoco() {
-      let process = "Uploading COCO annotation file";
-      this.addProcess(process);
-
-      let form = new FormData();
-
+    importModal() {
+      if (this.importing.id != null) {
+        this.$router.push({ path: "/tasks", query: { id: this.importing.id } });
+        return;
+      }
+      
+      $('#cocoUpload').modal('show');
+    },
+    importCOCO() {
       let uploaded = document.getElementById("coco");
-      form.append("coco", uploaded.files[0]);
-      axios
-        .post("/api/dataset/" + this.dataset.id + "/coco", form, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
+      Dataset.uploadCoco(this.dataset.id, uploaded.files[0])
+        .then(response => {
+          let id = response.data.id;
+          this.importing.id = id;
         })
-        .then(() => {})
         .catch(error => {
-          this.axiosReqestError("Loading Dataset", error.response.data.message);
+          this.axiosReqestError("Importing COCO", error.response.data.message);
         })
         .finally(() => this.removeProcess(process));
     },
@@ -325,7 +413,50 @@ export default {
       this.sidebar.canResize = false;
     }
   },
+  computed: {
+    queryAnnotated() {
+      let showAnnotated = this.panel.showAnnotated;
+      let showNotAnnotated = this.panel.showNotAnnotated;
+
+      if (showAnnotated && showNotAnnotated) return null;
+      if (!showAnnotated && !showNotAnnotated) return " ";
+
+      return showAnnotated;
+    }
+  },
+  sockets: {
+    taskProgress(data) {
+
+      if (data.id === this.scan.id) {
+        this.scan.progress = data.progress;
+      }
+
+      if (data.id === this.generate.id) {
+        this.generate.progress = data.progress;
+      }
+
+      if (data.id === this.importing.id) {
+        this.importing.progress = data.progress;
+      }
+    },
+    annotating(data) {
+      let image = this.images.find(i => i.id == data.image_id);
+      if (image == null) return;
+
+      if (data.active) {
+        let found = image.annotating.indexOf(data.username);
+        if (found < 0) {
+          image.annotating.push(data.username);
+        }
+      } else {
+        image.annotating.splice(image.annotating.indexOf(data.username), 1);
+      }
+    }
+  },
   watch: {
+    queryAnnotated() {
+      this.updatePage();
+    },
     folders() {
       this.updatePage();
     },
@@ -337,6 +468,22 @@ export default {
       } else {
         this.$el.style.cursor = "default";
         el.style.borderRight = "";
+      }
+    },
+    "scan.progress"(progress) {
+      if (progress >= 100) {
+        setTimeout(() => {
+          this.scan.progress = 0;
+          this.scan.id = null;
+        }, 1000);
+      }
+    },
+    "importing.progress"(progress) {
+      if (progress >= 100) {
+        setTimeout(() => {
+          this.importing.progress = 0;
+          this.importing.id = null;
+        }, 1000);
       }
     }
   },
@@ -374,6 +521,11 @@ export default {
 
 .sidebar .title {
   color: white;
+}
+
+.progress {
+  padding: 2px;
+  height: 24px;
 }
 
 .sidebar {

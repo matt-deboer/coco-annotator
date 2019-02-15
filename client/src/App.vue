@@ -14,7 +14,7 @@ export default {
   components: { NavBar },
   methods: {
     ...mapMutations("user", ["setUserInfo"]),
-    ...mapMutations("info", ["getServerInfo"]),
+    ...mapMutations("info", ["getServerInfo", "socket"]),
     toAuthPage() {
       this.$router.push({
         name: "authentication"
@@ -43,6 +43,9 @@ export default {
     },
     loading() {
       return this.$store.state.info.loading;
+    },
+    socketConnection() {
+      return this.$store.state.info.socket;
     }
   },
   watch: {
@@ -50,6 +53,22 @@ export default {
       if (!this.loading && this.loader != null) {
         this.loader.hide();
       }
+    },
+    socketConnection() {
+      if (this.socketConnection) return;
+
+      setTimeout(() => {
+        if (this.socketConnection) return;
+        let options = {
+          positionClass: "toast-bottom-left"
+        };
+
+        this.$toastr.warning(
+          "Connection lost to the backend",
+          "Connection Lost",
+          options
+        );
+      }, 1000);
     },
     loginRequired: {
       handler(newValue) {
@@ -64,6 +83,14 @@ export default {
         }
       },
       immediate: true
+    }
+  },
+  sockets: {
+    connect() {
+      this.socket(true);
+    },
+    disconnect() {
+      this.socket(false);
     }
   },
   mounted() {
