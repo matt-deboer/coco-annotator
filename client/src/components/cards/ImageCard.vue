@@ -6,13 +6,15 @@
       @mouseover="hover = true"
       @mouseleave="hover = false"
     >
-      <img
-        class="card-img-top"
-        :style="{'opacity': annotated ? 0.3 : 1}"
-        @click="openAnnotator"
-        style="width: 100%; display: block"
-        :src="imageUrl"
-      />
+      <div @click="openAnnotator">
+        <v-lazy-image
+          :src="imageUrl"
+          :src-placeholder="loaderUrl"
+          class="card-img-top"
+          style="width: 100%; display: block"
+          :style="{'opacity': annotated ? 0.3 : 1}"
+        />
+      </div>
 
       <b v-if="annotated" class="overlay-text text-center">
         Being annotated by {{image.annotating.join(', ')}}
@@ -93,7 +95,8 @@ export default {
   data() {
     return {
       hover: false,
-      showAnnotations: true
+      showAnnotations: true,
+      loaderUrl: require("@/assets/loader.gif"),
     };
   },
   methods: {
