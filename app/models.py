@@ -103,11 +103,43 @@ class DatasetModel(db.DynamicDocument):
 
         return task.api_json()
 
+    def is_owner(self, user):
+
+        if user.is_admin:
+            return True
+        
+        return user.username.lower() == self.owner.lower()
+
+    def can_download(self, user):
+        return self.is_owner(user)
+
+    def can_delete(self, user):
+        return self.is_owner(user)
+    
+    def can_share(self, user):
+        return self.is_owner(user)
+    
+    def can_generate(self, user):
+        return self.is_owner(user)
+
+    def can_edit(self, user):
+        return user.username in self.users or self.is_owner(user)
+    
+    def permissions(self, user):
+        return {
+            'owner': self.is_owner(user),
+            'edit': self.can_edit(user),
+            'share': self.can_share(user),
+            'generate': self.can_generate(user),
+            'delete': self.can_delete(user),
+            'download': self.can_download(user)
+        }
 
 class ImageModel(db.DynamicDocument):
     
     PATTERN = (".gif", ".png", ".jpg", ".jpeg", ".bmp")
-    
+    _dataset = None
+
     id = db.SequenceField(primary_key=True)
     path = db.StringField(required=True, unique=True)
 
@@ -196,6 +228,12 @@ class ImageModel(db.DynamicDocument):
 
         return annotations.count()
 
+    @property
+    def dataset(self):
+        if self._dataset is None:
+            self._dataset = DatasetModel.objects(id=self.dataset_id).first()
+        return self._dataset
+
     def __call__(self):
 
         image = im.Image.from_path(self.path)
@@ -204,6 +242,19 @@ class ImageModel(db.DynamicDocument):
                 image.add(annotation())
 
         return image
+    
+    def can_delete(self, user):
+        return user.can_delete(self.dataset)
+    
+    def can_download(self, user):
+        return user.can_download(self.dataset)
+    
+    # TODO: Fix why using the functions throws an error
+    def permissions(self, user):
+        return {
+            'delete': True,
+            'download': True
+        }
 
 
 class AnnotationModel(db.DynamicDocument):
@@ -223,6 +274,8 @@ class AnnotationModel(db.DynamicDocument):
     height = db.IntField()
 
     color = db.StringField()
+    
+    keypoints = db.ListField(default=[])
 
     metadata = db.DictField(default={})
     paper_object = db.ListField(default=[])
@@ -312,6 +365,10 @@ class CategoryModel(db.DynamicDocument):
     creator = db.StringField(default="unknown")
     deleted = db.BooleanField(default=False)
     deleted_date = db.DateTimeField()
+
+    keypoint_edges = db.ListField(default=[])
+    keypoint_labels = db.ListField(default=[])
+    
 
     @classmethod
     def bulk_create(cls, categories):
@@ -464,6 +521,7 @@ class TaskModel(db.DynamicDocument):
             "name": self.name
         }
 
+
 class CocoImportModel(db.DynamicDocument):
     id = db.SequenceField(primary_key=True)
     creator = db.StringField(required=True)
@@ -482,6 +540,7 @@ class UserModel(db.DynamicDocument, UserMixin):
     is_admin = db.BooleanField(default=False)
 
     preferences = db.DictField(default={})
+    permissions = db.ListField(defualt=[])
 
     def save(self, *args, **kwargs):
 
@@ -527,6 +586,29 @@ class UserModel(db.DynamicDocument, UserMixin):
 
         image_ids = self.images.distinct('id')
         return AnnotationModel.objects(image_id__in=image_ids)
+
+    def can_view(self, model):
+        if model is None:
+            return False
+
+        return model.can_view(self)
+    
+    def can_download(self, model):
+        if model is None:
+            return False
+
+        return model.can_download(self)
+        
+    def can_delete(self, model):
+        if model is None:
+            return False
+        return model.can_delete(self)
+
+    def can_edit(self, model):
+        if model is None:
+            return False
+
+        return model.can_edit(self)
 
     def _update_last_seen(self):
         self.update(last_seen=datetime.datetime.now())

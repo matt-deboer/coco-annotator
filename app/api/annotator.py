@@ -26,13 +26,13 @@ class AnnotatorData(Resource):
 
         image_model = ImageModel.objects(id=image_id).first()
 
-        # Check if current user can access dataset
-        if current_user.datasets.filter(id=image_model.dataset_id).first() is None:
-            return {'success': False, 'message': 'Could not find associated dataset'}
-
         if image_model is None:
             return {'success': False, 'message': 'Image does not exist'}, 400
 
+        # Check if current user can access dataset
+        if current_user.datasets.filter(id=image_model.dataset_id).first() is None:
+            return {'success': False, 'message': 'Could not find associated dataset'}
+        
         categories = CategoryModel.objects.all()
         annotations = AnnotationModel.objects(image_id=image_id)
 
@@ -52,7 +52,11 @@ class AnnotatorData(Resource):
             if db_category is None:
                 continue
 
-            db_category.update(set__color=category.get('color'))
+            db_category.update(
+                set__color=category.get('color'),
+                set__keypoint_edges=category.get('keypoint_edges', []),
+                set__keypoint_labels=category.get('keypoint_labels', [])
+            )
 
             # Iterate every annotation from the data annotations
             for annotation in category.get('annotations', []):
@@ -69,6 +73,7 @@ class AnnotatorData(Resource):
 
                 # Update annotation in database
                 db_annotation.update(
+                    set__keypoints=annotation.get('keypoints', []),
                     set__metadata=annotation.get('metadata'),
                     set__color=annotation.get('color')
                 )
@@ -148,7 +153,11 @@ class AnnotatorId(Resource):
             'image': query_util.fix_ids(image),
             'categories': [],
             'dataset': query_util.fix_ids(dataset),
-            'preferences': preferences
+            'preferences': preferences,
+            'permissions': {
+                'dataset': dataset.permissions(current_user),
+                'image': image.permissions(current_user)
+            }
         }
 
         data['image']['previous'] = image_previous

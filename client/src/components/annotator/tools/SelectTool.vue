@@ -40,20 +40,14 @@ export default {
         annotation: null,
         annotationText: null
       },
+      keypoint: null,
       hitOptions: {
         segments: true,
         stroke: true,
         fill: false,
         tolerance: 5,
         match: hit => {
-          if (this.point == null) return true;
-          if (
-            hit.item instanceof paper.Path ||
-            hit.item instanceof paper.CompoundPath
-          ) {
-            return !hit.item.hasOwnProperty("indicator");
-          }
-          return true;
+          return !hit.item.hasOwnProperty("indicator");
         }
       }
     };
@@ -69,6 +63,16 @@ export default {
     },
     generateTitle() {
       let string = " ";
+      if (this.keypoint) {
+        let index = this.keypoint.keypoint.indexLabel;
+        let visibility = this.keypoint.keypoint.visibility;
+
+        string += "Keypoint \n";
+        string += "Visibility: " + visibility + " \n";
+        string += index == -1 ? "No Label \n" : "Label: " + this.keypoint.keypoints.labels[index-1] + " \n";
+        return string.replace(/\n/g, " \n ").slice(0, -2);        
+      }
+
       if (this.hover.category && this.hover.annotation) {
         let id = this.hover.textId;
         let category = this.hover.category.category.name;
@@ -83,9 +87,10 @@ export default {
         }
       }
 
-      return string.replace(/\n/g, " \n ").slice(0, -2);
+      return string.replace(/\n/g, " \n ").slice(0, -2) + " \n ";
     },
     generateStringFromMetadata() {
+      if (this.keypoint) return "";
       let string = "";
       let metadata = this.hover.annotation.$refs.metadata.metadataList;
 
@@ -104,25 +109,28 @@ export default {
     },
     hoverText() {
       if (!this.hover.showText) return;
-
-      if (this.hover.category == null) return;
-      if (this.hover.annotation == null) return;
+      if (!this.keypoint) {
+        if (this.hover.category == null) return;
+        if (this.hover.annotation == null) return;
+      }
 
       let position = this.hover.position.add(this.hover.textShift, 0);
 
       if (
         this.hover.text == null ||
-        this.hover.annotation.annotation.id !== this.hover.textId
+        this.hover.annotation.annotation.id !== this.hover.textId ||
+        this.keypoint != null
       ) {
         if (this.hover.text !== null) {
           this.hover.text.remove();
           this.hover.box.remove();
         }
-
-        this.hover.textId = this.hover.annotation.annotation.id;
         let content =
-          this.generateTitle() + " \n " + this.generateStringFromMetadata();
-
+          this.generateTitle() + this.generateStringFromMetadata();
+        if (this.hover.annotation) {
+          this.hover.textId = this.hover.annotation.annotation.id;
+        }
+        
         this.hover.text = new paper.PointText(position);
         this.hover.text.justification = "left";
         this.hover.text.fillColor = "black";
@@ -177,6 +185,19 @@ export default {
 
       if (this.point != null) {
         this.edit.canMove = this.point.contains(event.point);
+      } else {
+        this.edit.canMove = false;
+      }
+    },
+    clear() {
+      this.hover.category = null;
+      this.hover.annotation = null;
+
+      if (this.hover.text != null) {
+        this.hover.text.remove();
+        this.hover.box.remove();
+        this.hover.text = null;
+        this.hover.box = null;
       }
     },
     createPoint(point) {
@@ -190,8 +211,7 @@ export default {
       this.point.indicator = true;
     },
     onMouseDrag(event) {
-      if (this.segment) {
-        if (!this.edit.canMove) return;
+      if (this.segment && this.edit.canMove) {
         this.createPoint(event.point);
         this.segment.point = event.point;
       }
@@ -226,13 +246,14 @@ export default {
       this.$parent.hover.category = -1;
 
       this.$parent.paper.project.activeLayer.selected = false;
+      let item = event.item;
+
+      this.keypoint = null;
       if (
         event.item &&
-        event.item.visible &&
         event.item.data.hasOwnProperty("categoryId") &&
         event.item.hasChildren()
       ) {
-        let item = event.item;
         this.$parent.hover.category = item.data.categoryId;
         this.hover.category = this.$parent.getCategory(item.data.categoryId);
 
@@ -258,20 +279,20 @@ export default {
             break;
           }
         }
+      } else if (event.item && event.item.hasOwnProperty("keypoint")) {
+        this.hover.position = event.point;
+        this.keypoint = item;
       } else {
-        this.hover.category = null;
-        this.hover.annotation = null;
-
-        if (this.hover.text != null) {
-          this.hover.text.remove();
-          this.hover.box.remove();
-          this.hover.text = null;
-          this.hover.box = null;
-        }
+        this.clear();
       }
     }
   },
   watch: {
+    keypoint(keypoint) {
+      this.clear();
+      if (!keypoint) return;
+      this.hoverText();
+    },
     scale: {
       handler(newScale) {
         this.hover.rounded = newScale * 5;
