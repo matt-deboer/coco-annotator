@@ -29,6 +29,8 @@ class DatasetModel(db.DynamicDocument):
     owner = db.StringField(required=True)
     users = db.ListField(default=[])
 
+    annotate_url = db.StringField(default="")
+
     default_annotation_metadata = db.DictField(default={})
 
     deleted = db.BooleanField(default=False)
@@ -411,6 +413,20 @@ class CategoryModel(db.DynamicDocument):
             'id': self.id
         }
         return im.Category(**data)
+    
+    def is_owner(self, user):
+
+        if user.is_admin:
+            return True
+        
+        return user.username.lower() == self.creator.lower()
+    
+    def can_edit(self, user):
+        return self.is_owner(user)
+    
+    def can_delete(self, user):
+        return self.is_owner(user)
+
 
 
 class LicenseModel(db.DynamicDocument):

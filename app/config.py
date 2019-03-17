@@ -14,9 +14,9 @@ class Config:
 
     # Flask instance
     SWAGGER_UI_JSONEDITOR = True
-    MAX_CONTENT_LENGTH = 1 * 1024 * 1024 * 1024  # 1GB
+    MAX_CONTENT_LENGTH = os.getenv("MAX_CONTENT_LENGTH", 1 * 1024 * 1024 * 1024)  # 1GB
     MONGODB_HOST = os.getenv("MONGODB_HOST", "mongodb://database/flask")
-    SECRET_KEY = os.getenv("SECRET_KEY", "<--- DEFAULT_SECRET_KEY --->")
+    SECRET_KEY = os.getenv("SECRET_KEY", "<--- CHANGE THIS KEY --->")
 
     TESTING = os.getenv("TESTING", False)
 
@@ -52,3 +52,9 @@ class Config:
     # User Options
     LOGIN_DISABLED = os.getenv("LOGIN_DISABLED", False)
     ALLOW_REGISTRATION = True
+
+    # Models
+    MASK_RCNN_FILE = os.getenv("MASK_RCNN_FILE", "")
+    MASK_RCNN_CLASSES = os.getenv("MASK_RCNN_CLASSES", "BG")
+
+    DEXTR_FILE = os.getenv("DEXTR_FILE", "/models/dextr_pascal-sbd.h5")

@@ -22,16 +22,20 @@ class AnnotatorData(Resource):
         """
         data = request.get_json(force=True)
         image = data.get('image')
+        dataset = data.get('dataset')
         image_id = image.get('id')
-
+        
         image_model = ImageModel.objects(id=image_id).first()
 
         if image_model is None:
             return {'success': False, 'message': 'Image does not exist'}, 400
 
         # Check if current user can access dataset
-        if current_user.datasets.filter(id=image_model.dataset_id).first() is None:
+        db_dataset = current_user.datasets.filter(id=image_model.dataset_id).first()
+        if dataset is None:
             return {'success': False, 'message': 'Could not find associated dataset'}
+        
+        db_dataset.update(annotate_url=dataset.get('annotate_url', ''))
         
         categories = CategoryModel.objects.all()
         annotations = AnnotationModel.objects(image_id=image_id)
@@ -52,11 +56,12 @@ class AnnotatorData(Resource):
             if db_category is None:
                 continue
 
-            db_category.update(
-                set__color=category.get('color'),
-                set__keypoint_edges=category.get('keypoint_edges', []),
-                set__keypoint_labels=category.get('keypoint_labels', [])
-            )
+            category_update = {'color': category.get('color')}
+            if current_user.can_edit(db_category):
+                category_update['keypoint_edges'] = category.get('keypoint_edges', [])
+                category_update['keypoint_labels'] = category.get('keypoint_labels', [])
+            
+            db_category.update(**category_update)
 
             # Iterate every annotation from the data annotations
             for annotation in category.get('annotations', []):

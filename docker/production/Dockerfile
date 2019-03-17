@@ -26,17 +26,28 @@ RUN apt-get update && \
 
 WORKDIR /workspace
 
-COPY --from=build-stage /workspace/client/dist /workspace/dist
-
-# Setup flask
 COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt && \
+        pip install gunicorn[eventlet]==19.9.0 && \
+        pip install pycocotools
 
-RUN pip install gunicorn==19.9.0
-RUN pip install -r requirements.txt
-RUN pip install pycocotools
+# Install maskrcnn
+RUN git clone --single-branch --depth 1 https://github.com/matterport/Mask_RCNN.git $TEMP_MRCNN_DIR /tmp/maskrcnn && \
+        cd /tmp/maskrcnn && \
+        pip install -r requirements.txt && \
+        python3 setup.py install
+
+# Install DEXTR
+RUN git clone --single --depth 1 https://github.com/jsbroks/dextr-keras.git /tmp/dextr && \
+        cd /tmp/dextr && \
+        pip install -r requirements.txt && \
+        python setup.py install
 
 COPY ./.git /workspace/.git
 COPY ./app /workspace/app
 
+COPY --from=build-stage /workspace/client/dist /workspace/dist
+
 EXPOSE 5000
-CMD gunicorn -w 1 -b 0.0.0.0:5000 app:app --worker-class eventlet --log-level debug --no-sendfile
+CMD gunicorn -w 1 -b 0.0.0.0:5000 app:app --worker-class eventlet --log-level debug --no-sendfile --timeout 180
+

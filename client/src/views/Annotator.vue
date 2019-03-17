@@ -45,8 +45,16 @@
           @setcursor="setCursor"
           ref="keypoint"
         />
+        <DEXTRTool
+          v-model="activeTool"
+          :scale="image.scale"
+          @setcursor="setCursor"
+          ref="dextr"
+        />
       </div>
       <hr />
+
+      <AnnotateButton :annotate-url="dataset.annotate_url" />
 
       <div v-show="mode == 'segment'">
         <CopyAnnotationsButton
@@ -58,7 +66,7 @@
         <ShowAllButton />
         <HideAllButton />
       </div>
-
+      <hr>
       <CenterButton />
       <UndoButton />
 
@@ -169,6 +177,11 @@
               :current-annotation="currentAnnotation"
             />
           </div>
+          <div v-if="$refs.dextr != null">
+            <DEXTRPanel
+              :dextr="$refs.dextr"
+            />
+          </div>
         </div>
       </div>
     </aside>
@@ -195,6 +208,7 @@ import shortcuts from "@/mixins/shortcuts";
 import FileTitle from "@/components/annotator/FileTitle";
 import Category from "@/components/annotator/Category";
 import Label from "@/components/annotator/Label";
+import Annotations from "@/models/annotations";
 
 import PolygonTool from "@/components/annotator/tools/PolygonTool";
 import SelectTool from "@/components/annotator/tools/SelectTool";
@@ -202,6 +216,7 @@ import MagicWandTool from "@/components/annotator/tools/MagicWandTool";
 import EraserTool from "@/components/annotator/tools/EraserTool";
 import BrushTool from "@/components/annotator/tools/BrushTool";
 import KeypointTool from "@/components/annotator/tools/KeypointTool";
+import DEXTRTool from "@/components/annotator/tools/DEXTRTool";
 
 import CopyAnnotationsButton from "@/components/annotator/tools/CopyAnnotationsButton";
 import CenterButton from "@/components/annotator/tools/CenterButton";
@@ -213,6 +228,7 @@ import DeleteButton from "@/components/annotator/tools/DeleteButton";
 import UndoButton from "@/components/annotator/tools/UndoButton";
 import ShowAllButton from "@/components/annotator/tools/ShowAllButton";
 import HideAllButton from "@/components/annotator/tools/HideAllButton";
+import AnnotateButton from "@/components/annotator/tools/AnnotateButton";
 
 import PolygonPanel from "@/components/annotator/panels/PolygonPanel";
 import SelectPanel from "@/components/annotator/panels/SelectPanel";
@@ -220,6 +236,7 @@ import MagicWandPanel from "@/components/annotator/panels/MagicWandPanel";
 import BrushPanel from "@/components/annotator/panels/BrushPanel";
 import EraserPanel from "@/components/annotator/panels/EraserPanel";
 import KeypointPanel from "@/components/annotator/panels/KeypointPanel";
+import DEXTRPanel from "@/components/annotator/panels/DEXTRPanel";
 
 import { mapMutations } from "vuex";
 
@@ -250,7 +267,10 @@ export default {
     UndoButton,
     HideAllButton,
     ShowAllButton,
-    KeypointPanel
+    KeypointPanel,
+    AnnotateButton,
+    DEXTRTool,
+    DEXTRPanel
   },
   mixins: [toastrs, shortcuts],
   props: {
@@ -302,7 +322,9 @@ export default {
         topRight: null
       },
       categories: [],
-      dataset: {},
+      dataset: {
+        annotate_url: ""
+      },
       loading: {
         image: true,
         data: true,
@@ -328,6 +350,7 @@ export default {
           select: this.$refs.select.export(),
           settings: this.$refs.settings.export()
         },
+        dataset: this.dataset,
         image: {
           id: this.image.id,
           metadata: this.$refs.settings.exportMetadata(),
@@ -474,6 +497,8 @@ export default {
         this.text.topRight.fontSize = fontSize;
         this.text.topRight.fillColor = "white";
         this.text.topRight.content = width + "x" + height;
+
+        this.getData();
       };
     },
     setPreferences(preferences) {
@@ -691,6 +716,30 @@ export default {
         category.isVisible = false;
         category.showAnnotations = false;
       });
+    },
+
+    addAnnotation(category, segments, keypoints) {
+      segments = segments || [];
+      keypoints = keypoints || [];
+
+      if (keypoints.length == 0 && segments.length == 0) return;
+
+      category = this.$refs.category.find(
+        c => c.category.name.toLowerCase() === category.toLowerCase()
+      );
+      if (category == null) return;
+
+      category = category.category;
+
+      Annotations.create({
+        image_id: this.image.id,
+        category_id: category.id,
+        segmentation: segments,
+        keypoints: keypoints
+      }).then(response => {
+        let annotation = response.data;
+        category.annotations.push(annotation);
+      });
     }
   },
   watch: {
@@ -772,7 +821,6 @@ export default {
     });
 
     this.initCanvas();
-    this.getData();
     this.$socket.emit("annotating", { image_id: this.image.id, active: true });
   },
   created() {
