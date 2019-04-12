@@ -3,7 +3,7 @@ import queue
 import cv2
 import pymongo
 import numpy as np
-from ..models import ImageModel, AnnotationModel, CategoryModel
+from database import ImageModel, AnnotationModel, CategoryModel
 from skimage.measure import compare_ssim
 from ..util.annotation_util import (
     segmentation_equal, extract_cropped_patch, segmentation_to_contours,
