@@ -62,5 +62,22 @@ class Config:
 
     DEXTR_FILE = os.getenv("DEXTR_FILE", "/models/dextr_pascal-sbd.h5")
 
+    # Autoannotator options
+    AUTOANNOTATOR_ENABLED = os.getenv("AUTOANNOTATOR_ENABLED", False)
+    AUTOANNOTATOR_VERBOSE = os.getenv("AUTOANNOTATOR_VERBOSE", False)
+    AUTOANNOTATOR_MAX_WORKERS = int(
+        os.getenv("AUTOANNOTATOR_MAX_WORKERS", 4))
+    AUTOANNOTATOR_QUEUE_SIZE = int(
+        os.getenv("AUTOANNOTATOR_QUEUE_SIZE", 32))
+    AUTOANNOTATOR_MAX_MISMATCHED = int(
+        os.getenv("AUTOANNOTATOR_MAX_MISMATCHED", 5))
+    AUTOANNOTATOR_DIFF_THRESHOLD = float(
+        os.getenv("AUTOANNOTATOR_DIFF_THRESHOLD", 0.0035))
+
+    # Autoexporter Options
+    AUTOEXPORTER_ENABLED = os.getenv("AUTOEXPORTER_ENABLED", False)
+    AUTOEXPORTER_VERBOSE = os.getenv("AUTOEXPORTER_VERBOSE", False)
+    AUTOEXPORTER_EXTENSION = os.getenv("AUTOEXPORTER_EXTENSION", ".coco.json")
+
 
 __all__ = ["Config"]
