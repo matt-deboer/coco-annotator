@@ -259,6 +259,12 @@ export default {
           visibility: 2
         }
       },
+      sessions: [],
+      session: {
+        start: Date.now(),
+        tools: [],
+        milliseconds: 0
+      },
       tagRecomputeCounter: 0
     };
   },
@@ -313,6 +319,8 @@ export default {
         $(`#annotationSettings${this.annotation.id}`).modal("show");
       };
       this.keypoints = new Keypoints(this.keypointEdges, this.keypointLabels);
+      this.keypoints.radius = this.scale * 6;
+      this.keypoints.lineWidth = this.scale * 2;
 
       let keypoints = this.annotation.keypoints;
       if (keypoints) {
@@ -348,7 +356,10 @@ export default {
       }
 
       this.compoundPath.data.annotationId = this.index;
+      this.compoundPath.data.categoryId = this.categoryIndex;
+
       this.compoundPath.fullySelected = this.isCurrent;
+      this.compoundPath.opacity = this.opacity;
 
       this.setColor();
 
@@ -417,6 +428,7 @@ export default {
       if (this.compoundPath instanceof paper.Path) {
         this.compoundPath = new paper.CompoundPath(this.compoundPath);
         this.compoundPath.data.annotationId = this.index;
+        this.compoundPath.data.categoryId = this.categoryIndex;
       }
 
       let newChildren = [];
@@ -458,7 +470,8 @@ export default {
         indexLabel: label || -1,
         radius: this.scale * 6,
         onClick: event => {
-          if (!this.$parent.isCurrent) return;
+          this.onAnnotationClick();
+
           if (!["Select", "Keypoints"].includes(this.activeTool)) return;
           let keypoint = event.target.keypoint;
 
@@ -525,7 +538,11 @@ export default {
       if (this.compoundPath == null) this.createCompoundPath();
 
       let newCompound = this.compoundPath.unite(compound);
+      newCompound.strokeColor = null;
+      newCompound.strokeWidth = 0;
       newCompound.onDoubleClick = this.compoundPath.onDoubleClick;
+      newCompound.onClick = this.compoundPath.onClick;
+
       if (undoable) this.createUndoAction("Unite");
 
       this.compoundPath.remove();
@@ -561,14 +578,9 @@ export default {
         return;
       }
 
+      this.compoundPath.opacity = this.opacity;
       this.compoundPath.fillColor = this.color;
-      let h = Math.round(this.compoundPath.fillColor.hue);
-      let l = Math.round(this.compoundPath.fillColor.lightness * 50);
-      let s = Math.round(this.compoundPath.fillColor.saturation * 100);
-
-      let hsl = "hsl(" + h + "," + s + "%," + l + "%)";
-      this.compoundPath.strokeColor = hsl;
-      this.keypoints.color = hsl;
+      this.keypoints.color = this.darkHSL;
     },
     export() {
       if (this.compoundPath == null) this.createCompoundPath();
@@ -601,6 +613,10 @@ export default {
         annotationData.compoundPath = json;
       }
 
+      // Export sessions and reset
+      annotationData.sessions = this.sessions;
+      this.sessions = [];
+
       return annotationData;
     },
     emitModify() {
@@ -619,6 +635,14 @@ export default {
     }
   },
   watch: {
+    activeTool(tool) {
+      if (this.isCurrent) {
+        this.session.tools.push(tool);
+      }
+    },
+    opacity(opacity) {
+      this.compoundPath.opacity = opacity;
+    },
     color() {
       this.setColor();
     },
@@ -632,7 +656,6 @@ export default {
       if (this.compoundPath == null) return;
 
       this.compoundPath.visible = this.isVisible;
-      this.$parent.group.addChild(this.compoundPath);
       this.setColor();
       this.isEmpty = this.compoundPath.isEmpty() && this.keypoints.isEmpty();
     },
@@ -642,7 +665,18 @@ export default {
     annotation() {
       this.initAnnotation();
     },
-    isCurrent() {
+    isCurrent(current, wasCurrent) {
+      if (current) {
+        // Start new session
+        this.session.start = Date.now();
+        this.session.tools = [this.activeTool];
+      }
+      if (wasCurrent) {
+        // Close session
+        this.session.milliseconds = Date.now() - this.session.start;
+        this.sessions.push(this.session);
+      }
+
       if (this.compoundPath == null) return;
       this.compoundPath.fullySelected = this.isCurrent;
     },
@@ -660,18 +694,23 @@ export default {
       this.currentKeypoint.visibility = newVal;
     },
     keypointEdges(newEdges) {
+      this.keypoints.color = this.darkHSL;
       newEdges.forEach(e => this.keypoints.addEdge(e));
     },
     scale: {
       immediate: true,
       handler(scale) {
         if (!this.keypoints) return;
+
         this.keypoints.radius = scale * 6;
         this.keypoints.lineWidth = scale * 2;
       }
     }
   },
   computed: {
+    categoryIndex() {
+      return this.$parent.index;
+    },
     isCurrent() {
       if (this.index === this.current && this.$parent.isCurrent) {
         if (this.compoundPath != null) this.compoundPath.bringToFront();
@@ -697,13 +736,12 @@ export default {
       if (search === String(this.index + 1)) return true;
       return this.name.toLowerCase().includes(this.search);
     },
-    hsl() {
-      if (this.compoundPath == null) return [0, 0, 0];
-      let h = Math.round(this.compoundPath.fillColor.hue);
-      let l = Math.round(this.compoundPath.fillColor.lightness * 50);
-      let s = Math.round(this.compoundPath.fillColor.saturation * 100);
-
-      return [h, s, l];
+    darkHSL() {
+      let color = new paper.Color(this.color);
+      let h = Math.round(color.hue);
+      let l = Math.round(color.lightness * 50);
+      let s = Math.round(color.saturation * 100);
+      return "hsl(" + h + "," + s + "%," + l + "%)";
     },
     notUsedKeypointLabels() {
       this.tagRecomputeCounter;

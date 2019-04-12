@@ -1,44 +1,122 @@
 <template>
   <div @mousemove="mouseMove">
     <div style="padding-top: 55px" />
+    
     <div
-      class="album py-5 bg-light"
-      style="overflow: auto; height: calc(100vh - 55px)"
+      class="bg-light"
       :style="{ 'margin-left': sidebar.width + 'px' }"
     >
-      <div class="container">
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item"></li>
-          <li class="breadcrumb-item active">
-            <button class="btn btn-sm btn-link" @click="folders = []">
-              {{ dataset.name }}
-            </button>
-          </li>
-          <li
-            v-for="(folder, folderId) in folders"
-            :key="folderId"
-            class="breadcrumb-item"
-          >
-            <button
-              class="btn btn-sm btn-link"
-              :disabled="folders[folders.length - 1] === folder"
-              @click="removeFolder(folder)"
+      <nav class="nav border-bottom shadow-sm" style="background-color: #4b5162">
+        <a class="btn tab" @click="tab = 'images'" :style="{'color': tab == 'images' ? 'white' : 'darkgray'}">
+          <i class="fa fa-picture-o" aria-hidden="true"></i> Images
+        </a>
+        <a class="btn tab" @click="tab = 'exports'" :style="{'color': tab == 'exports' ? 'white' : 'darkgray'}">
+          <i class="fa fa-share" aria-hidden="true"></i> Exports
+        </a>
+        <a class="btn tab" @click="tab = 'members'" :style="{'color': tab == 'members' ? 'white' : 'darkgray'}">
+          <i class="fa fa-users" aria-hidden="true"></i> Members
+        </a>
+        <a class="btn tab" @click="tab = 'statistics'" :style="{'color': tab == 'statistics' ? 'white' : 'darkgray'}">
+          <i class="fa fa-bar-chart" aria-hidden="true"></i> Statistics
+        </a>
+        <a class="btn tab" @click="tab = 'settings'" :style="{'color': tab == 'settings' ? 'white' : 'darkgray'}">
+          <i class="fa fa-cog" aria-hidden="true"></i> Settings
+        </a>
+      </nav>
+    
+      <div class="bg-light text-left" style="overflow: auto; height: calc(100vh - 100px); margin: 10px">
+        <div class="container" v-show="tab == 'images'">
+          
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"></li>
+            <li class="breadcrumb-item active">
+              <button class="btn btn-sm btn-link" @click="folders = []">
+                {{ dataset.name }}
+              </button>
+            </li>
+            <li
+              v-for="(folder, folderId) in folders"
+              :key="folderId"
+              class="breadcrumb-item"
             >
-              {{ folder }}
-            </button>
-          </li>
-        </ol>
+              <button
+                class="btn btn-sm btn-link"
+                :disabled="folders[folders.length - 1] === folder"
+                @click="removeFolder(folder)"
+              >
+                {{ folder }}
+              </button>
+            </li>
+          </ol>
 
-        <p class="text-center" v-if="images.length < 1">
-          No images found in directory.
-        </p>
-        <div v-else>
-          <Pagination :pages="pages" @pagechange="updatePage" />
-          <div class="row">
-            <ImageCard v-for="image in images" :key="image.id" :image="image" />
+          <p class="text-center" v-if="images.length < 1">
+            No images found in directory.
+          </p>
+          <div v-else>
+            <Pagination :pages="pages" @pagechange="updatePage" />
+            <div class="row">
+              <ImageCard v-for="image in images" :key="image.id" :image="image" />
+            </div>
+            <Pagination :pages="pages" @pagechange="updatePage" />
           </div>
-          <hr />
+
         </div>
+        <div class="container" v-show="tab == 'exports'">Empty</div>
+        <div class="container" v-show="tab == 'members'">
+
+          <div class="card my-3 p-3 shadow-sm mr-2">
+            <h6 class="border-bottom border-gray pb-2"><b>Invite Members</b></h6>
+            
+          </div>
+          
+          <div class="card my-3 p-3 shadow-sm mr-2">
+            <h6 class="border-bottom border-gray pb-2"><b>Exisiting Memebers</b></h6>
+            
+            <div class="media text-muted pt-3" v-for="user in users">
+              <img src="https://d1nhio0ox7pgb.cloudfront.net/_img/o_collection_png/green_dark_grey/256x256/plain/user.png" class="mr-2 rounded" style="width: 32px; height: 32px;">
+              <div class="media-body pb-3 mb-0 small lh-125 border-bottom border-gray">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                  <div class="text-gray-dark">
+                    <strong>{{ user.name }}</strong> @{{user.username}}
+                  </div>
+                  <a href="#">{{ user.group }}</a>
+                </div>
+                <span class="d-block">Last seen: {{ new Date(user.last_seen['$date']).toISOString().slice(0, 19).replace('T', ' ') }} UTC</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="container" v-show="tab == 'statistics'">
+          <div v-if="stats == null">
+            Crunching numbers...
+          </div>
+
+          <div v-else>
+            <div class="row">
+              
+              <div v-if="stats.total" class="card my-3 p-3 shadow-sm col-3 mr-2">
+                <h6 class="border-bottom border-gray pb-2"><b>Total</b></h6>
+                <div class="row" v-for="stat in Object.keys(stats.total)">
+                  <strong class="col-8">{{stat}}:</strong>
+                  <span class="col-4">{{stats.total[stat].toFixed(0)}}</span>
+                </div>
+              </div>
+
+              <div v-if="stats.average" class="card my-3 p-3 shadow-sm col-4 mr-2">
+                <h6 class="border-bottom border-gray pb-2"><b>Average</b></h6>
+                <div class="row" v-for="stat in Object.keys(stats.average)">
+                  <strong class="col-8">{{stat}}:</strong>
+                  <span class="col-4">{{stats.average[stat].toFixed(0)}}</span>
+                </div>
+              </div>
+
+            </div>
+            
+          </div>
+        </div>
+        <div class="container" v-show="tab == 'settings'">settings</div>
+
       </div>
     </div>
 
@@ -71,21 +149,7 @@
           </div>
           <div v-else>Generate</div>
         </button>
-        <button
-          type="button"
-          class="btn btn-primary btn-block"
-          @click="importModal"
-        >
-          <div v-if="importing.id != null" class="progress">
-            <div
-              class="progress-bar bg-primary"
-              :style="{ 'width': `${importing.progress}%` }"
-            >
-              Importing
-            </div>
-          </div>
-          <div v-else>Importing COCO</div>
-        </button>
+
         <button
           type="button"
           class="btn btn-secondary btn-block"
@@ -102,9 +166,37 @@
           <div v-else>Scan</div>
         </button>
 
-        <!-- <button type="button" class="btn btn-info">
-          Download COCO
-        </button> -->
+        <button
+          type="button"
+          class="btn btn-primary btn-block"
+          @click="importModal"
+        >
+          <div v-if="importing.id != null" class="progress">
+            <div
+              class="progress-bar bg-primary"
+              :style="{ 'width': `${importing.progress}%` }"
+            >
+              Importing
+            </div>
+          </div>
+          <div v-else>Import COCO</div>
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-dark btn-block"
+          @click="exportCOCO"
+        >
+          <div v-if="exporting.id != null" class="progress">
+            <div
+              class="progress-bar bg-dark"
+              :style="{ 'width': `${exporting.progress}%` }"
+            >
+              Exporting
+            </div>
+          </div>
+          <div v-else>Export COCO</div>
+        </button>
       </div>
       <hr>
       <h6 class="sidebar-title text-center">Subdirectories</h6>
@@ -268,6 +360,7 @@ export default {
       dataset: {
         id: 0
       },
+      users: [],
       subdirectories: [],
       status: {
         data: { state: true, message: "Loading data" }
@@ -295,6 +388,7 @@ export default {
         progress: 0,
         id: null
       },
+      tab: "images",
       query: {
         file_name__icontains: "",
         ...this.$route.query
@@ -302,7 +396,8 @@ export default {
       panel: {
         showAnnotated: true,
         showNotAnnotated: true
-      }
+      },
+      stats: null
     };
   },
   methods: {
@@ -346,6 +441,18 @@ export default {
         })
         .finally(() => this.removeProcess(process));
     },
+    getUsers() {
+      Dataset.getUsers(this.dataset.id)
+        .then(response => {
+          this.users = response.data
+        });
+    },
+    getStats() {
+      Dataset.getStats(this.dataset.id)
+        .then(response => {
+          this.stats = response.data;
+        });
+    },
     createScanTask() {
       if (this.scan.id != null) {
         this.$router.push({ path: "/tasks", query: { id: this.scan.id } });
@@ -362,6 +469,22 @@ export default {
             "Scanning Dataset",
             error.response.data.message
           );
+        })
+        .finally(() => this.removeProcess(process));
+    },
+    exportCOCO() {
+      if (this.exporting.id != null) {
+        this.$router.push({ path: "/tasks", query: { id: this.exporting.id } });
+        return;
+      }
+
+      Dataset.exportingCOCO(this.dataset.id)
+        .then(response => {
+          let id = response.data.id;
+          this.exporting.id = id;
+        })
+        .catch(error => {
+          this.axiosReqestError("Exporting COCO", error.response.data.message);
         })
         .finally(() => this.removeProcess(process));
     },
@@ -437,6 +560,10 @@ export default {
       if (data.id === this.importing.id) {
         this.importing.progress = data.progress;
       }
+
+      if (data.id === this.exporting.id) {
+        this.exporting.progress = data.progress;
+      }
     },
     annotating(data) {
       let image = this.images.find(i => i.id == data.image_id);
@@ -453,6 +580,11 @@ export default {
     }
   },
   watch: {
+    tab(tab) {
+      localStorage.setItem('dataset/tab', tab);
+      if (tab == 'members') this.getUsers();
+      if (tab == 'statistics') this.getStats();
+    },
     queryAnnotated() {
       this.updatePage();
     },
@@ -484,6 +616,14 @@ export default {
           this.importing.id = null;
         }, 1000);
       }
+    },
+    "exporting.progress"(progress) {
+      if (progress >= 100) {
+        setTimeout(() => {
+          this.exporting.progress = 0;
+          this.exporting.id = null;
+        }, 1000);
+      }
     }
   },
   beforeRouteUpdate() {
@@ -500,6 +640,10 @@ export default {
   mounted() {
     window.addEventListener("mouseup", this.stopDrag);
     window.addEventListener("mousedown", this.startDrag);
+
+    let tab = localStorage.getItem('dataset/tab');
+    if (tab !== null)
+      this.tab = tab;
   },
   destroyed() {
     window.removeEventListener("mouseup", this.stopDrag);

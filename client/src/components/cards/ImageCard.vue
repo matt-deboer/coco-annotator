@@ -1,7 +1,7 @@
 <template>
   <div class="col-md-3">
     <div
-      class="card mb-4 box-shadow"
+      class="card mb-4 shadow-sm"
       :class="{'border': annotated, 'border-danger': annotated}"
       @mouseover="hover = true"
       @mouseleave="hover = false"
@@ -148,12 +148,9 @@ export default {
     imageUrl() {
       let d = new Date();
       if (this.image.annotations > 0 && this.showAnnotations) {
-        return (
-          "/api/image/" +
-          this.image.id +
-          "/thumbnail?width=250&dummy=" +
-          d.getTime()
-        );
+        return `/api/image/${
+          this.image.id
+        }?width=250&thumbnail=true&dummy=${d.getTime()}`;
       } else {
         return "/api/image/" + this.image.id + "?width=250";
       }

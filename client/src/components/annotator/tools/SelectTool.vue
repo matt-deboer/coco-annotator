@@ -159,6 +159,8 @@ export default {
         2;
       this.hover.box.position = position.add(this.hover.shift, 0);
       this.hover.text.position = position.add(this.hover.shift, 0);
+
+      this.hover.box.bringToFront();
       this.hover.text.bringToFront();
     },
     onMouseDown(event) {
@@ -251,36 +253,24 @@ export default {
       let item = event.item;
 
       this.keypoint = null;
+
       if (
         event.item &&
-        event.item.data.hasOwnProperty("categoryId") &&
-        event.item.hasChildren()
+        event.item.data.hasOwnProperty("annotationId") &&
+        event.item.data.hasOwnProperty("categoryId")
       ) {
-        this.$parent.hover.category = item.data.categoryId;
-        this.hover.category = this.$parent.getCategory(item.data.categoryId);
+        this.hover.position = event.point;
 
-        if (this.hover.category == null) return;
+        let categoryId = event.item.data.categoryId;
+        let annotationId = event.item.data.annotationId;
+        this.$parent.hover.categoryId = categoryId;
+        this.$parent.hover.annotation = annotationId;
 
-        for (let i = 0; i < item.children.length; i++) {
-          let child = item.children[i];
+        this.hover.category = this.$parent.getCategory(categoryId);
+        this.hover.annotation = this.hover.category.getAnnotation(annotationId);
+        event.item.selected = true;
 
-          if (
-            child.visible &&
-            child.contains(event.point) &&
-            child.data.hasOwnProperty("annotationId")
-          ) {
-            this.hover.position = event.point;
-            this.$parent.hover.annotation = child.data.annotationId;
-
-            this.hover.annotation = this.hover.category.getAnnotation(
-              child.data.annotationId
-            );
-            child.selected = true;
-
-            this.hoverText();
-            break;
-          }
-        }
+        this.hoverText();
       } else if (event.item && event.item.hasOwnProperty("keypoint")) {
         this.hover.position = event.point;
         this.keypoint = item;

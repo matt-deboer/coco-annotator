@@ -1,5 +1,6 @@
 <template>
   <div style="display: block; height: inherit;">
+    
     <aside v-show="panels.show.left" class="left-panel shadow-lg">
       <div v-show="mode == 'segment'">
         <hr />
@@ -111,7 +112,7 @@
           v-if="categories.length == 0"
           style="color: lightgray; font-size: 12px"
         >
-          No categories have been added to this image.
+          No categories have been enabled for this image.
         </p>
 
         <div
@@ -190,11 +191,18 @@
       <div id="frame" class="frame" @wheel="onwheel">
         <canvas class="canvas" id="editor" ref="image" resize />
       </div>
-
-      <!-- <div v-show="!doneLoading">
-        <i class="fa fa-spinner fa-pulse fa-x fa-fw status-icon"></i>
-      </div> -->
     </div>
+
+    <div v-show="annotating.length > 0" class="fixed-bottom alert alert-warning alert-dismissible fade show">
+      <span>
+      This image is being annotated by <b>{{ annotating.join(', ') }}</b>.
+      </span>
+      
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+
   </div>
 </template>
 
@@ -283,7 +291,7 @@ export default {
     return {
       activeTool: "Select",
       paper: null,
-      shapeOpacity: 0.5,
+      shapeOpacity: 0.6,
       zoom: 0.2,
       cursor: "move",
       mode: "segment",
@@ -330,7 +338,8 @@ export default {
         data: true,
         loader: null
       },
-      search: ""
+      search: "",
+      annotating: []
     };
   },
   methods: {
@@ -393,6 +402,9 @@ export default {
         .finally(() => this.removeProcess(process));
     },
     onwheel(e) {
+      e.preventDefault();
+      if (!this.doneLoading) return;
+
       let view = this.paper.view;
 
       if (e.ctrlKey) {
@@ -411,16 +423,15 @@ export default {
         let transform = this.changeZoom(e.deltaY, viewPosition);
 
         if (transform.zoom < 10 && transform.zoom > 0.01) {
-          this.image.scale = 1 / this.paper.view.zoom;
+          this.image.scale = 1 / transform.zoom;
           this.paper.view.zoom = transform.zoom;
           this.paper.view.center = view.center.add(transform.offset);
         }
       }
 
-      e.preventDefault();
       return false;
     },
-    fit: function() {
+    fit() {
       let canvas = document.getElementById("editor");
 
       let parentX = this.image.raster.width;
@@ -469,7 +480,6 @@ export default {
         this.fit();
         this.image.ratio = (width * height) / 1000000;
         this.removeProcess(process);
-        this.loading.image = false;
 
         let tempCtx = document.createElement("canvas").getContext("2d");
         tempCtx.canvas.width = width;
@@ -498,7 +508,7 @@ export default {
         this.text.topRight.fillColor = "white";
         this.text.topRight.content = width + "x" + height;
 
-        this.getData();
+        this.loading.image = false;
       };
     },
     setPreferences(preferences) {
@@ -518,6 +528,8 @@ export default {
         .get("/api/annotator/data/" + this.image.id)
         .then(response => {
           let data = response.data;
+
+          this.loading.data = false;
           // Set image data
           this.image.metadata = data.image.metadata || {};
           this.image.filename = data.image.file_name;
@@ -525,12 +537,13 @@ export default {
           this.image.previous = data.image.previous;
           this.image.categoryIds = data.image.category_ids || [];
 
+          this.annotating = data.image.annotating || [];
+
           // Set other data
           this.dataset = data.dataset;
           this.categories = data.categories;
 
           // Update status
-          this.loading.data = false;
 
           this.setDataset(this.dataset);
 
@@ -660,7 +673,7 @@ export default {
             this.current.annotation += 1;
           }
         } else {
-          // If at a category which has annotations showing, go though annotations
+          // If at a category which has annotations showing, go through annotations
           this.current.category += 1;
           if (
             this.currentCategory != null &&
@@ -740,12 +753,24 @@ export default {
         let annotation = response.data;
         category.annotations.push(annotation);
       });
+    },
+
+    removeFromAnnotatingList() {
+      if (this.user == null) return;
+
+      var index = this.annotating.indexOf(this.user.username);
+      //Remove self from list
+      if (index > -1) {
+        this.annotating.splice(index, 1);
+      }
     }
   },
   watch: {
-    doneLoading() {
-      if (this.loading.loader) {
-        this.loading.loader.hide();
+    doneLoading(done) {
+      if (done) {
+        if (this.loading.loader) {
+          this.loading.loader.hide();
+        }
       }
     },
     currentCategory() {
@@ -782,6 +807,12 @@ export default {
           this.current.annotations = -1;
         }
       }
+    },
+    annotating() {
+      this.removeFromAnnotatingList();
+    },
+    user() {
+      this.removeFromAnnotatingList();
     }
   },
   computed: {
@@ -802,25 +833,48 @@ export default {
       return this.currentCategory.getAnnotation(this.current.annotation);
     },
     user() {
-      return this.$store.user.user;
+      return this.$store.getters["user/user"];
+    }
+  },
+  sockets: {
+    annotating(data) {
+      if (data.image_id !== this.image.id) return;
+
+      if (data.active) {
+        let found = this.annotating.indexOf(data.username);
+        if (found < 0) {
+          this.annotating.push(data.username);
+        }
+      } else {
+        this.annotating.splice(this.annotating.indexOf(data.username), 1);
+      }
     }
   },
   beforeRouteLeave(to, from, next) {
-    this.$socket.emit("annotating", { image_id: this.image.id, active: false });
-    this.save(next);
+    this.current.annotation = -1;
+
+    this.$nextTick(() => {
+      this.$socket.emit("annotating", {
+        image_id: this.image.id,
+        active: false
+      });
+      this.save(next);
+    });
   },
   mounted() {
     this.setDataset(null);
 
-    this.loading.loader = this.$loading.show({
-      color: "white",
-      backgroundColor: "#4b5162",
-      height: 150,
-      opacity: 0.7,
-      width: 150
-    });
+    // this.loading.loader = this.$loading.show({
+    //   color: "white",
+    //   // backgroundColor: "#4b5162",
+    //   height: 150,
+    //   opacity: 0.8,
+    //   width: 150
+    // });
 
     this.initCanvas();
+    this.getData();
+
     this.$socket.emit("annotating", { image_id: this.image.id, active: true });
   },
   created() {
@@ -833,6 +887,14 @@ export default {
 </script>
 
 <style scoped>
+.alert {
+  bottom: 0;
+  width: 50%;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* width */
 ::-webkit-scrollbar {
   width: 7px;
