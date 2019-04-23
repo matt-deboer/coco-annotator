@@ -32,6 +32,8 @@ class DatasetModel(DynamicDocument):
 
         if not os.path.exists(directory):
             os.makedirs(directory)
+            #changing permission of folder to upload images with out sudo permissions (anyone can upload images)
+            os.chmod(directory,0o777)
 
         self.directory = directory
 
@@ -69,9 +71,12 @@ class DatasetModel(DynamicDocument):
             "name": task.name
         }
 
-    def export_coco(self, style="COCO"):
+    def export_coco(self, categories=None, style="COCO"):
 
         from workers.tasks import export_annotations
+
+        if categories is None or len(categories) == 0:
+            categories = self.categories
 
         task = TaskModel(
             name=f"Exporting {self.name} into {style} format",
@@ -80,7 +85,7 @@ class DatasetModel(DynamicDocument):
         )
         task.save()
 
-        cel_task = export_annotations.delay(task.id, self.id)
+        cel_task = export_annotations.delay(task.id, self.id, categories)
 
         return {
             "celery_id": cel_task.id,
