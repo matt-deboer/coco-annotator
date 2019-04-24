@@ -9,8 +9,6 @@ from ..util import coco_util
 from ..util.autoannotator import Autoannotator
 from ..util.autoexporter import Autoexporter
 from ..util import annotation_util
-from ..models import *
-
 from ..util import query_util, coco_util, profile
 
 from config import Config
@@ -138,7 +136,7 @@ class AnnotatorData(Resource):
                     if area > 0:
                         annotated = True
 
-        if autoannotator_ids:
+        if Autoannotator.enabled and autoannotator_ids:
             Autoannotator.submit(image_id, autoannotator_ids,
                                  wait_for_next=True, wait_for_prev=True)
 
