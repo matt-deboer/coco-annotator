@@ -1,7 +1,7 @@
 import os
 import json
-from ..util.coco_util import get_image_coco
-from ..util.concurrency_util import ExceptionLoggingThreadPoolExecutor
+from .coco_util import get_image_coco
+from .concurrency_util import ExceptionLoggingThreadPoolExecutor
 
 
 class Autoexporter:
@@ -52,6 +52,6 @@ class Autoexporter:
         if cls.verbose:
             cls.log(f"Processing image {image_model.file_name}...")
 
-        coco_json = get_image_coco(image_model)
+        coco_json = get_image_coco(image_model.id)
         coco_path = os.path.splitext(image_model.path)[0] + cls.extension
         json.dump(coco_json, open(coco_path, 'w'))
