@@ -21,11 +21,14 @@ def rect_union(a, b):
 
 
 def bbox_for_contours(contours):
-    bbox = (0, 0, 0, 0)
+    bbox = None
     for cnt in contours:
-        bbox = rect_union(bbox, cv2.boundingRect(cnt))
+        bnd_rect = cv2.boundingRect(cnt)
+        if bbox:
+            bbox = rect_union(bbox, bnd_rect)
+        else:
+            bbox = bnd_rect
     return bbox
-
 
 def segmentation_to_contours(segmentation):
     contours = list()
