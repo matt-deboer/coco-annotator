@@ -1,6 +1,7 @@
 import threading
 import queue
 import cv2
+import os
 import pymongo
 import numpy as np
 from database import ImageModel, AnnotationModel, CategoryModel
@@ -23,6 +24,7 @@ class Autoannotator:
     verbose = False
     image_cache = dict()
     image_cache_lock = threading.Lock()
+    feature_detector = cv2.AKAZE_create()
 
     @classmethod
     def log(cls, msg):
@@ -138,9 +140,73 @@ class Autoannotator:
                                     prev_complete=prev_complete,
                                     next_complete=next_complete)
 
+    # @classmethod
+    # def census_transform(cls, img):
+    #     """
+    #         see https://stackoverflow.com/a/38269363/486132
+    #     """
+    #     h, w, _ = img.shape
+    #     if img.shape[2] == 3:
+    #         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #     else:
+    #         gray = img
+
+    #     census = np.zeros((h - 2, w - 2), dtype='uint8')
+    #     crop = gray[1: h - 1, 1: w - 1]
+
+    #     diff = [(u, v) for v in range(3) for u in range(3) if not u == 1 == v]
+
+    #     for u, v in diff:
+    #         census = (census << 1) | (gray[v: v + h - 2, u: u + w - 2] >= crop)
+
+    #     return census
+
+    @classmethod
+    def compare_images(cls, img1, img2, kp_1, desc_1, img2_name):
+        if img1.shape == img2.shape:
+            difference = cv2.subtract(img1, img2)
+            px_count = float(img1.shape[0] * img1.shape[1])
+            if len(img1.shape) > 2 and img1.shape[2] == 3:
+                b, g, r = cv2.split(difference)
+                diff_score = (px_count - cv2.countNonZero(b))
+                diff_score += (px_count - cv2.countNonZero(g))
+                diff_score += (px_count - cv2.countNonZero(r))
+                diff_score /= 3 * px_count
+            else:
+                diff_score = (
+                    px_count - cv2.countNonZero(difference)) / px_count
+            if diff_score == 1.0:
+                return diff_score
+        print(f"diff_score for {img2_name}: {diff_score:.4f}")
+
+        kp_2, desc_2 = cls.feature_detector.detectAndCompute(img2, None)
+
+        if max(len(desc_1), len(desc_2)) > 1000:
+            index_params = dict(algorithm=6, table_number=12, key_size=20,
+                                multi_probe_level=2)
+            search_params = dict()
+            matcher = cv2.FlannBasedMatcher(index_params, search_params)
+        else:
+            matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+
+        matches = matcher.knnMatch(desc_1, desc_2, k=2)
+        good_points = []
+        ratio = 0.5
+        for match1, match2 in matches:
+            if match1.distance < ratio * match2.distance:
+                good_points.append(match1)
+
+        # result = cv2.drawMatches(img1, kp_1, img2, kp_2, good_points, None)
+        # parts = os.path.splitext(img2_name)
+        # cv2.imwrite(f"{parts[0]}_compare{parts[1]}", result)
+
+        return float(len(good_points)) / len(matches)
+
     @classmethod
     def compare_and_copy(cls, annotations, category_names, image_from,
-                         images, masks, bboxes, patches, first_complete):
+                         images, masks, bboxes, patches,
+                         keypoints, descriptors,
+                         first_complete):
         """
         Compares the provided annotation against all images in the
         images iterable and copies the annotation to those images where
@@ -171,6 +237,7 @@ class Autoannotator:
             to_cvimg = cls.get_cvimg(image_to)
 
             annotations_ids_to_copy = list()
+            category_ids_to_copy = list()
             existing_annotations_replaced = list()
             for i, annotation in enumerate(annotations):
                 if finished[i]:
@@ -189,13 +256,17 @@ class Autoannotator:
                 to_patch = extract_cropped_patch(
                     to_cvimg, masks[i], bboxes[i])
 
-                score, _ = compare_ssim(
-                    patches[i], to_patch, full=True, multichannel=True)
+                # score, _ = compare_ssim(
+                #     patches[i], to_patch, full=True, multichannel=True)
+                score = cls.compare_images(patches[i], to_patch,
+                                           keypoints[i], descriptors[i],
+                                           image_to.path)
                 if cls.verbose:
                     msg = (f"Annotation {category_name}({annotation.id}) vs. "
                            f"image {image_to.file_name} score: {score:.5f}: ")
 
-                if (1.0 - score) > cls.diff_threshold:
+                # if (1.0 - score) > cls.diff_threshold:
+                if score < cls.diff_threshold:
                     mismatched[i] += 1
                     if cls.verbose:
                         msg += "mismatch"
@@ -243,9 +314,20 @@ class Autoannotator:
                 mismatched[i] = 0
                 matched[i] += 1
                 annotations_ids_to_copy.append(annotation.id)
+                category_ids_to_copy.append(annotation.category_id)
 
             image_to.copy_annotations(
                 AnnotationModel.objects(id__in=annotations_ids_to_copy))
+
+            image_category_ids = list(image_to.category_ids)
+            image_category_ids += category_ids_to_copy
+            image_category_ids = list(set(image_category_ids))
+
+            image_to.update(
+                set__annotated=True,
+                set__category_ids=image_category_ids,
+                set__regenerate_thumbnail=True
+            )
 
             if Autoexporter.enabled:
                 Autoexporter.submit(image_to)
@@ -292,6 +374,8 @@ class Autoannotator:
         masks = list()
         bboxes = list()
         patches = list()
+        keypoints = list()
+        descriptors = list()
 
         image_from = ImageModel.objects(id=image_id).first()
         from_cvimg = cls.get_cvimg(image_from)
@@ -313,6 +397,9 @@ class Autoannotator:
             patch = extract_cropped_patch(
                 from_cvimg, mask, bbox)
             patches.append(patch)
+            kp, desc = cls.feature_detector.detectAndCompute(patch, None)
+            keypoints.append(kp)
+            descriptors.append(desc)
 
         images_before, images_after = cls.images_before_and_after(image_from)
 
@@ -322,6 +409,7 @@ class Autoannotator:
                             image_from=image_from,
                             images=images_after,
                             masks=masks, bboxes=bboxes, patches=patches,
+                            keypoints=keypoints, descriptors=descriptors,
                             first_complete=next_complete)
 
         cls.executor.submit(cls.compare_and_copy,
@@ -330,4 +418,5 @@ class Autoannotator:
                             image_from=image_from,
                             images=images_before,
                             masks=masks, bboxes=bboxes, patches=patches,
+                            keypoints=keypoints, descriptors=descriptors,
                             first_complete=prev_complete)
