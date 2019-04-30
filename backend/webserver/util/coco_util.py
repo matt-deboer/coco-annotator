@@ -125,7 +125,7 @@ def get_image_coco(image_id):
     bulk_categories = CategoryModel.objects(id__in=dataset.categories, deleted=False) \
         .only(*CategoryModel.COCO_PROPERTIES)
 
-    print(bulk_categories)
+    # print(bulk_categories)
 
     db_annotations = AnnotationModel.objects(deleted=False, image_id=image_id)
     categories = []
