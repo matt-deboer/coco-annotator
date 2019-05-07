@@ -200,7 +200,7 @@ class Autoannotator:
         # parts = os.path.splitext(img2_name)
         # cv2.imwrite(f"{parts[0]}_compare{parts[1]}", result)
 
-        return float(len(good_points)) / len(matches)
+        return float(len(good_points)) / len(matches), len(good_points)
 
     @classmethod
     def compare_and_copy(cls, annotations, category_names, image_from,
@@ -258,12 +258,13 @@ class Autoannotator:
 
                 # score, _ = compare_ssim(
                 #     patches[i], to_patch, full=True, multichannel=True)
-                score = cls.compare_images(patches[i], to_patch,
-                                           keypoints[i], descriptors[i],
-                                           image_to.path)
+                score, good_ct = cls.compare_images(
+                    patches[i], to_patch, keypoints[i],
+                    descriptors[i], image_to.path)
                 if cls.verbose:
                     msg = (f"Annotation {category_name}({annotation.id}) vs. "
-                           f"image {image_to.file_name} score: {score:.5f}: ")
+                           f"image {image_to.file_name} score: {score:.5f} "
+                           f"(good points: {good_ct}): ")
 
                 # if (1.0 - score) > cls.diff_threshold:
                 if score < cls.diff_threshold:
