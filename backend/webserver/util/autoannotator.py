@@ -192,9 +192,11 @@ class Autoannotator:
         matches = matcher.knnMatch(desc_1, desc_2, k=2)
         good_points = []
         ratio = 0.5
-        for match1, match2 in matches:
-            if match1.distance < ratio * match2.distance:
-                good_points.append(match1)
+        for k_best in matches:
+            if len(k_best) == 2:
+                match1, match2 = k_best
+                if match1.distance < ratio * match2.distance:
+                    good_points.append(match1)
 
         # result = cv2.drawMatches(img1, kp_1, img2, kp_2, good_points, None)
         # parts = os.path.splitext(img2_name)
