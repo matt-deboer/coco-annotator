@@ -17,6 +17,40 @@ import sortedcontainers
 from functools import lru_cache
 
 
+class AnnotationContext:
+
+    @classmethod
+    def log(cls, msg):
+        print(f"[{cls.__name__}] {msg}", flush=True)
+
+    def __init__(self, annotation, cvimg):
+        self.annotation = annotation
+        self.cvimg = cvimg
+        self.category_name = CategoryModel.objects(
+            id=annotation.category_id).first().name
+        contours = segmentation_to_contours(annotation.segmentation)
+        mask = np.zeros(
+            (cvimg.shape[0], cvimg.shape[1]),
+            dtype=np.uint8)
+        self.mask = cv2.drawContours(mask, contours, -1, 1, -1)
+        self.bbox = bbox_for_contours(contours)
+        self.patch = extract_cropped_patch(
+            cvimg, self.mask, self.bbox)
+        # patches.append(patch)
+        fd = Autoannotator.feature_detector
+        self.keypoints, self.descriptor = fd.detectAndCompute(
+            self.patch, None)
+        if self.keypoints is None:
+            self.log("Error: failed to compute keypoints for annotation "
+                     f"{annotation.id} ('{self.category_name}')")
+        elif self.descriptor is None:
+            self.log("Error: failed to compute descriptor for annotation "
+                     f"{annotation.id} ('{self.category_name}');"
+                     f" bbox :{self.bbox},"
+                     f" patch.shape: {self.patch.shape}"
+                     " nonzero pixels")
+
+
 class Autoannotator:
     executor = None
     queue = None
@@ -181,6 +215,14 @@ class Autoannotator:
 
         kp_2, desc_2 = cls.feature_detector.detectAndCompute(img2, None)
 
+        if desc_1 is None:
+            print("ERROR: compare_images: received empty 'desc_1'")
+            return 0.0, 0
+        elif desc_2 is None:
+            print("ERROR: compare_images: feature_detector.detectAndCompute "
+                  "produced empty 'desc_2'")
+            return 0.0, 0
+
         if max(len(desc_1), len(desc_2)) > 1000:
             index_params = dict(algorithm=6, table_number=12, key_size=20,
                                 multi_probe_level=2)
@@ -205,19 +247,17 @@ class Autoannotator:
         return float(len(good_points)) / len(matches), len(good_points)
 
     @classmethod
-    def compare_and_copy(cls, annotations, category_names, image_from,
-                         images, masks, bboxes, patches,
-                         keypoints, descriptors,
-                         first_complete):
+    def compare_and_copy(cls, annotation_contexts, image_from,
+                         images, first_complete):
         """
         Compares the provided annotation against all images in the
         images iterable and copies the annotation to those images where
         it is a suitable match (and no existing annotation already covers it)
         """
-        replaced = [0] * len(annotations)
-        matched = [0] * len(annotations)
-        mismatched = [0] * len(annotations)
-        finished = [False] * len(annotations)
+        replaced = [0] * len(annotation_contexts)
+        matched = [0] * len(annotation_contexts)
+        mismatched = [0] * len(annotation_contexts)
+        finished = [False] * len(annotation_contexts)
 
         if not images:
             first_complete.set_result(True)
@@ -241,32 +281,42 @@ class Autoannotator:
             annotations_ids_to_copy = list()
             category_ids_to_copy = list()
             existing_annotations_replaced = list()
-            for i, annotation in enumerate(annotations):
+            for i, ctx in enumerate(annotation_contexts):
                 if finished[i]:
                     continue
+                elif ctx.descriptor is None:
+                    cls.log(f"ERROR: annotation [{i}] id:{ctx.annotation.id} "
+                            f"('{ctx.category_name}') has no descriptor")
+                    continue
 
-                category_name = category_names[i]
                 if mismatched[i] > cls.max_mismatched:
                     if cls.verbose:
                         cls.log(
                             f"Exceeded {cls.max_mismatched} consecutive "
-                            f"mismatched images for {category_name}"
-                            f"({annotation.id}); stopping match test")
+                            f"mismatched images for {ctx.category_name}"
+                            f"({ctx.annotation.id}); stopping match test")
                     finished[i] = True
                     continue
 
                 to_patch = extract_cropped_patch(
-                    to_cvimg, masks[i], bboxes[i])
+                    to_cvimg, ctx.mask, ctx.bbox)
 
                 # score, _ = compare_ssim(
                 #     patches[i], to_patch, full=True, multichannel=True)
-                score, good_ct = cls.compare_images(
-                    patches[i], to_patch, keypoints[i],
-                    descriptors[i], image_to.path)
-                if cls.verbose:
-                    msg = (f"Annotation {category_name}({annotation.id}) vs. "
-                           f"image {image_to.file_name} score: {score:.5f} "
-                           f"(good points: {good_ct}): ")
+                try:
+                    score, good_ct = cls.compare_images(
+                        ctx.patch, to_patch, ctx.keypoints,
+                        ctx.descriptor, image_to.path)
+                    if cls.verbose:
+                        msg = (f"Annotation {ctx.category_name}"
+                               f"({ctx.annotation.id}) vs. "
+                               f"image {image_to.file_name} score: {score:.5f}"
+                               f" (good points: {good_ct}): ")
+                except TypeError:
+                    cls.log(f"Error occurred while comparing "
+                            f"'{ctx.category_name}'"
+                            f" for {image_from.path} vs. {image_to.path}")
+                    raise
 
                 # if (1.0 - score) > cls.diff_threshold:
                 if score < cls.diff_threshold:
@@ -283,18 +333,18 @@ class Autoannotator:
                 existing_replaced = list()
                 for existing_ann in AnnotationModel.objects(
                         image_id=image_to.id,
-                        category_id=annotation.category_id,
+                        category_id=ctx.annotation.category_id,
                         deleted=False).all():
                     existing_iou = get_annotations_iou(
-                        annotation, existing_ann)
+                        ctx.annotation, existing_ann)
                     if existing_iou > 0:
-                        if existing_ann.area >= annotation.area:
+                        if existing_ann.area >= ctx.annotation.area:
                             if cls.verbose:
                                 cls.log(
                                     "Found existing intersecting annotation "
                                     f"{existing_ann.id} "
                                     "with greater or equal area for "
-                                    f"{category_name} on image "
+                                    f"{ctx.category_name} on image "
                                     f"{image_to.file_name}; skipping")
                             existing_is_better = True
                             break
@@ -316,8 +366,8 @@ class Autoannotator:
 
                 mismatched[i] = 0
                 matched[i] += 1
-                annotations_ids_to_copy.append(annotation.id)
-                category_ids_to_copy.append(annotation.category_id)
+                annotations_ids_to_copy.append(ctx.annotation.id)
+                category_ids_to_copy.append(ctx.annotation.category_id)
 
             image_to.copy_annotations(
                 AnnotationModel.objects(id__in=annotations_ids_to_copy))
@@ -343,8 +393,8 @@ class Autoannotator:
 
         if cls.verbose:
             msg = ""
-            for i, annotation in enumerate(annotations):
-                msg += (f"\ncopied {category_names[i]}({annotation.id}) "
+            for i, ctx in enumerate(annotation_contexts):
+                msg += (f"\ncopied {ctx.category_name}({ctx.annotation.id}) "
                         f"to {matched[i]} images")
                 if replaced[i]:
                     msg += f", replacing {replaced[i]} existing annotations"
@@ -373,53 +423,26 @@ class Autoannotator:
             cls.log(f"Error: no annotations matching ids {annotation_ids}")
             return
 
-        category_names = list()
-        masks = list()
-        bboxes = list()
-        patches = list()
-        keypoints = list()
-        descriptors = list()
-
         image_from = ImageModel.objects(id=image_id).first()
         from_cvimg = cls.get_cvimg(image_from)
 
+        annotation_contexts = list()
+
         for annotation in annotations:
-            category_names.append(CategoryModel.objects(
-                id=annotation.category_id).first().name)
-
-            contours = segmentation_to_contours(annotation.segmentation)
-            mask = np.zeros(
-                (from_cvimg.shape[0], from_cvimg.shape[1]),
-                dtype=np.uint8)
-            mask = cv2.drawContours(mask, contours, -1, 1, -1)
-            masks.append(mask)
-
-            bbox = bbox_for_contours(contours)
-            bboxes.append(bbox)
-
-            patch = extract_cropped_patch(
-                from_cvimg, mask, bbox)
-            patches.append(patch)
-            kp, desc = cls.feature_detector.detectAndCompute(patch, None)
-            keypoints.append(kp)
-            descriptors.append(desc)
+            ctx = AnnotationContext(annotation, from_cvimg)
+            if ctx.descriptor is not None:
+                annotation_contexts.append(ctx)
 
         images_before, images_after = cls.images_before_and_after(image_from)
 
         cls.executor.submit(cls.compare_and_copy,
-                            annotations=annotations,
-                            category_names=category_names,
+                            annotation_contexts=annotation_contexts,
                             image_from=image_from,
                             images=images_after,
-                            masks=masks, bboxes=bboxes, patches=patches,
-                            keypoints=keypoints, descriptors=descriptors,
                             first_complete=next_complete)
 
         cls.executor.submit(cls.compare_and_copy,
-                            annotations=annotations,
-                            category_names=category_names,
+                            annotation_contexts=annotation_contexts,
                             image_from=image_from,
                             images=images_before,
-                            masks=masks, bboxes=bboxes, patches=patches,
-                            keypoints=keypoints, descriptors=descriptors,
                             first_complete=prev_complete)
