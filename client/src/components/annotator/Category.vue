@@ -76,8 +76,8 @@
         :active-tool="activeTool"
         :scale="scale"
         @deleted="annotationDeleted"
+        :all-categories="getCategoriesList"
       />
-      
     </ul>
 
     <div
@@ -131,7 +131,6 @@
         </div>
       </div>
     </div>
-    
   </div>
 </template>
 
@@ -181,6 +180,10 @@ export default {
     activeTool: {
       type: String,
       required: true
+    },
+    allCategories: {
+      type: Array,
+      required: true
     }
   },
   data: function() {
@@ -208,10 +211,9 @@ export default {
     createAnnotation() {
       let parent = this.$parent;
       let annotationId = this.category.annotations.length;
-
       Annotations.create({
         image_id: parent.image.id,
-        category_id: this.category.id
+        category_id: this.category.id,
       }).then(response => {
         this.$socket.emit("annotation", {
           action: "create",
@@ -392,6 +394,12 @@ export default {
       let search = this.categorysearch.toLowerCase();
       if (search.length === 0) return true;
       return this.category.name.toLowerCase().includes(search);
+    },
+    getCategoriesList() {
+      return this.allCategories.map(category => ({
+        value: category.id,
+        text: category.name
+      }));
     },
     isCurrent() {
       return this.current.category === this.index;

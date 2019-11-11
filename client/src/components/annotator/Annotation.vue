@@ -94,7 +94,7 @@
                     <option :value="1">LABELED NOT VISIBLE</option>
                     <option :value="2">LABELED VISIBLE</option>
                   </select>
-                </div>  
+                </div>
               </div>
             </form>
           </div>
@@ -136,19 +136,31 @@
           <div class="modal-body">
             <form>
               <div class="form-group row">
-                <label class="col-sm-2 col-form-label">Color</label>
-                <div class="col-sm-9">
+                <label class="col-sm-3 col-form-label">Color</label>
+                <div class="col-sm-8">
                   <input v-model="color" type="color" class="form-control" />
                 </div>
               </div>
-
               <div class="form-group row">
-                <label class="col-sm-2 col-form-label">Name</label>
-                <div class="col-sm-9">
+                <label class="col-sm-3 col-form-label">Name</label>
+                <div class="col-sm-8">
                   <input v-model="name" class="form-control" />
                 </div>
               </div>
-
+              <div class="form-group row">
+                <label class="col-sm-3 col-form-label">Category</label>
+                <div class="col-sm-8">
+                  <select class="form-control" @change="setCategory">
+                    <option
+                      v-for="option in allCategories"
+                      :selected="annotation.category_id === option.value"
+                      :key="option.text"
+                    >
+                      {{ option.text }}
+                    </option>
+                  </select>
+                </div>
+              </div>
               <Metadata
                 :metadata="annotation.metadata"
                 ref="metadata"
@@ -236,6 +248,10 @@ export default {
     activeTool: {
       type: String,
       required: true
+    },
+    allCategories: {
+      type: Array,
+      default: () => []
     }
   },
   data() {
@@ -421,6 +437,10 @@ export default {
       this.addUndo(action);
     },
     simplifyPath() {
+      if (this.compoundPath != null && this.compoundPath.isEmpty()) {
+          this.deleteAnnotation();
+          return;
+      }
       let simplify = this.simplify;
 
       this.compoundPath.flatten(1);
@@ -532,9 +552,10 @@ export default {
      * Unites current annotation path with anyother path.
      * @param {paper.CompoundPath} compound compound to unite current annotation path with
      * @param {boolean} simplify simplify compound after unite
-     * @param {undoable} undoable add an undo action
+     * @param {undoable} undoable add an undo action.
+     * @param {isBBox} isBBox mark annotation as bbox.
      */
-    unite(compound, simplify = true, undoable = true) {
+    unite(compound, simplify = true, undoable = true, isBBox = false) {
       if (this.compoundPath == null) this.createCompoundPath();
 
       let newCompound = this.compoundPath.unite(compound);
@@ -542,7 +563,8 @@ export default {
       newCompound.strokeWidth = 0;
       newCompound.onDoubleClick = this.compoundPath.onDoubleClick;
       newCompound.onClick = this.compoundPath.onClick;
-
+      this.annotation.isbbox = isBBox;
+      
       if (undoable) this.createUndoAction("Unite");
 
       this.compoundPath.remove();
@@ -582,13 +604,25 @@ export default {
       this.compoundPath.fillColor = this.color;
       this.keypoints.color = this.darkHSL;
     },
+    setCategory(event) {
+      const newCategoryName = event.target.value;
+      const annotation = this.annotation;
+      const oldCategory = this.$parent.category;
+
+      this.$parent.$parent.updateAnnotationCategory(
+        annotation,
+        oldCategory,
+        newCategoryName
+      );
+      $(`#annotationSettings${annotation.id}`).modal("hide");
+    },
     export() {
       if (this.compoundPath == null) this.createCompoundPath();
-
       let metadata = this.$refs.metadata.export();
       if (this.name.length > 0) metadata.name = this.name;
       let annotationData = {
         id: this.annotation.id,
+        isbbox: this.annotation.isbbox,
         color: this.color,
         metadata: metadata
       };

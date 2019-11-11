@@ -13,12 +13,20 @@
         />
         <hr />
 
+        <BBoxTool
+          v-model="activeTool"
+          :scale="image.scale"
+          @setcursor="setCursor"
+          ref="bbox"
+        />
+
         <PolygonTool
           v-model="activeTool"
           :scale="image.scale"
           @setcursor="setCursor"
           ref="polygon"
         />
+
         <MagicWandTool
           v-model="activeTool"
           :width="image.raster.width"
@@ -92,6 +100,7 @@
         :previousimage="image.previous"
         :nextimage="image.next"
         :filename="image.filename"
+        ref="filetitle"
       />
 
       <div v-if="categories.length > 5">
@@ -125,6 +134,7 @@
             :simplify="simplify"
             :categorysearch="search"
             :category="category"
+            :all-categories="categories"
             :opacity="shapeOpacity"
             :hover="hover"
             :index="index"
@@ -152,6 +162,9 @@
         <h6 class="sidebar-title text-center">{{ activeTool }}</h6>
 
         <div class="tool-section" style="max-height: 30%; color: lightgray">
+          <div v-if="$refs.bbox != null">
+            <BBoxPanel :bbox="$refs.bbox" />
+          </div>
           <div v-if="$refs.polygon != null">
             <PolygonPanel :polygon="$refs.polygon" />
           </div>
@@ -202,7 +215,6 @@
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
-
   </div>
 </template>
 
@@ -219,6 +231,7 @@ import Label from "@/components/annotator/Label";
 import Annotations from "@/models/annotations";
 
 import PolygonTool from "@/components/annotator/tools/PolygonTool";
+import BBoxTool from "@/components/annotator/tools/BBoxTool";
 import SelectTool from "@/components/annotator/tools/SelectTool";
 import MagicWandTool from "@/components/annotator/tools/MagicWandTool";
 import EraserTool from "@/components/annotator/tools/EraserTool";
@@ -239,6 +252,7 @@ import HideAllButton from "@/components/annotator/tools/HideAllButton";
 import AnnotateButton from "@/components/annotator/tools/AnnotateButton";
 
 import PolygonPanel from "@/components/annotator/panels/PolygonPanel";
+import BBoxPanel from "@/components/annotator/panels/BBoxPanel";
 import SelectPanel from "@/components/annotator/panels/SelectPanel";
 import MagicWandPanel from "@/components/annotator/panels/MagicWandPanel";
 import BrushPanel from "@/components/annotator/panels/BrushPanel";
@@ -255,6 +269,8 @@ export default {
     CopyAnnotationsButton,
     Category,
     CLabel: Label,
+    BBoxTool,
+    BBoxPanel,
     PolygonTool,
     PolygonPanel,
     SelectTool,
@@ -352,6 +368,7 @@ export default {
       let data = {
         mode: this.mode,
         user: {
+          bbox: this.$refs.bbox.export(),
           polygon: this.$refs.polygon.export(),
           eraser: this.$refs.eraser.export(),
           brush: this.$refs.brush.export(),
@@ -514,6 +531,7 @@ export default {
     setPreferences(preferences) {
       let refs = this.$refs;
 
+      refs.bbox.setPreferences(preferences.bbox || preferences.polygon || {});
       refs.polygon.setPreferences(preferences.polygon || {});
       refs.select.setPreferences(preferences.select || {});
       refs.magicwand.setPreferences(preferences.magicwand || {});
@@ -585,9 +603,9 @@ export default {
       return this.$refs.category[index];
     },
     // Current Annotation Operations
-    uniteCurrentAnnotation(compound, simplify = true, undoable = true) {
+    uniteCurrentAnnotation(compound, simplify = true, undoable = true, isBBox = false) {
       if (this.currentAnnotation == null) return;
-      this.currentAnnotation.unite(compound, simplify, undoable);
+      this.currentAnnotation.unite(compound, simplify, undoable, isBBox);
     },
     subtractCurrentAnnotation(compound, simplify = true, undoable = true) {
       if (this.currentCategory == null) return;
@@ -730,19 +748,22 @@ export default {
         category.showAnnotations = false;
       });
     },
-
-    addAnnotation(category, segments, keypoints) {
+    findCategoryByName(categoryName) {
+      let categoryComponent = this.$refs.category.find(
+        category =>
+          category.category.name.toLowerCase() === categoryName.toLowerCase()
+      );
+      if (!categoryComponent) return null;
+      return categoryComponent.category;
+    },
+    addAnnotation(categoryName, segments, keypoints) {
       segments = segments || [];
       keypoints = keypoints || [];
 
       if (keypoints.length == 0 && segments.length == 0) return;
 
-      category = this.$refs.category.find(
-        c => c.category.name.toLowerCase() === category.toLowerCase()
-      );
+      let category = this.findCategoryByName(categoryName);
       if (category == null) return;
-
-      category = category.category;
 
       Annotations.create({
         image_id: this.image.id,
@@ -755,6 +776,29 @@ export default {
       });
     },
 
+    updateAnnotationCategory(annotation, oldCategory, newCategoryName) {
+      const newCategory = this.findCategoryByName(newCategoryName);
+      if (!newCategory || !annotation) return;
+
+      Annotations.update(annotation.id, { category_id: newCategory.id }).then(
+        response => {
+          let newAnnotation = {
+            ...response.data,
+            ...annotation,
+            metadata: response.data.metadata,
+            category_id: newCategory.id
+          };
+
+          if (newAnnotation) {
+            oldCategory.annotations = oldCategory.annotations.filter(
+              a => a.id !== annotation.id
+            );
+            newCategory.annotations.push(newAnnotation);
+          }
+        }
+      );
+    },
+
     removeFromAnnotatingList() {
       if (this.user == null) return;
 
@@ -763,6 +807,14 @@ export default {
       if (index > -1) {
         this.annotating.splice(index, 1);
       }
+    },
+    nextImage() {
+      if(this.image.next != null)
+        this.$refs.filetitle.route(this.image.next);
+    },
+    previousImage() {
+      if(this.image.previous != null)
+        this.$refs.filetitle.route(this.image.previous);
     }
   },
   watch: {

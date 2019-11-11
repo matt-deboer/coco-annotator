@@ -12,7 +12,7 @@ class ImageFolderHandler(FileSystemEventHandler):
     PREFIX = "[File Watcher]"
 
     def __init__(self, pattern=None):
-        self.pattern = pattern or (".gif", ".png", ".jpg", ".jpeg", ".bmp")
+        self.pattern = pattern or ImageModel.PATTERN
 
     def on_any_event(self, event):
 

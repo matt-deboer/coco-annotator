@@ -104,6 +104,7 @@ class AnnotatorData(Resource):
                 db_annotation.update(
                     add_to_set__events=sessions,
                     inc__milliseconds=total_time,
+                    set__isbbox=annotation.get('isbbox', False),
                     set__keypoints=annotation.get('keypoints', []),
                     set__metadata=annotation.get('metadata'),
                     set__color=annotation.get('color')
@@ -129,6 +130,7 @@ class AnnotatorData(Resource):
                     db_annotation.update(
                         set__segmentation=segmentation,
                         set__area=area,
+                        set__isbbox=annotation.get('isbbox', False),
                         set__bbox=bbox,
                         set__paper_object=paperjs_object,
                     )
@@ -144,7 +146,9 @@ class AnnotatorData(Resource):
             set__metadata=image.get('metadata', {}),
             set__annotated=annotated,
             set__category_ids=image.get('category_ids', []),
-            set__regenerate_thumbnail=annotated
+            set__regenerate_thumbnail=True,
+            set__num_annotations=annotations\
+                .filter(deleted=False, area__gt=0).count()
         )
 
         if Autoexporter.enabled:

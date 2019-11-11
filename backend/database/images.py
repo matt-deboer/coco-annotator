@@ -16,14 +16,17 @@ class ImageModel(DynamicDocument):
 
     # -- Contants
     THUMBNAIL_DIRECTORY = '.thumbnail'
-    PATTERN = (".gif", ".png", ".jpg", ".jpeg", ".bmp")
+    PATTERN = (".gif", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".GIF", ".PNG", ".JPG", ".JPEG", ".BMP", ".TIF", ".TIFF")
+
+    # Set maximum thumbnail size (h x w) to use on dataset page
+    MAX_THUMBNAIL_DIM = (1024, 1024)
 
     # -- Private
     _dataset = None
 
     # -- Database
     id = SequenceField(primary_key=True)
-    dataset_id = IntField()
+    dataset_id = IntField(required=True)
     category_ids = ListField(default=[])
 
     # Absolute path to image file
@@ -36,7 +39,8 @@ class ImageModel(DynamicDocument):
     annotated = BooleanField(default=False)
     # Poeple currently annotation the image
     annotating = ListField(default=[])
-
+    num_annotations = IntField(default=0)
+    
     thumbnail_url = StringField()
     image_url = StringField()
     coco_url = StringField()
@@ -101,7 +105,13 @@ class ImageModel(DynamicDocument):
 
             pil_image = self.generate_thumbnail()
             pil_image = pil_image.convert("RGB")
-            pil_image.save(thumbnail_path)
+
+            # Resize image to fit in MAX_THUMBNAIL_DIM envelope as necessary
+            pil_image.thumbnail((self.MAX_THUMBNAIL_DIM[1], self.MAX_THUMBNAIL_DIM[0]))
+
+            # Save as a jpeg to improve loading time
+            # (note file extension will not match but allows for backwards compatibility)
+            pil_image.save(thumbnail_path, "JPEG", quality=80, optimize=True, progressive=True)
 
             self.update(is_modified=False)
             return pil_image

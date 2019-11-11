@@ -97,7 +97,7 @@
           </div>
           
           <div class="card my-3 p-3 shadow-sm mr-2">
-            <h6 class="border-bottom border-gray pb-2"><b>Exisiting Memebers</b></h6>
+            <h6 class="border-bottom border-gray pb-2"><b>Existing Members</b></h6>
             
             <div class="media text-muted pt-3" v-for="user in users">
               <img src="https://d1nhio0ox7pgb.cloudfront.net/_img/o_collection_png/green_dark_grey/256x256/plain/user.png" class="mr-2 rounded" style="width: 32px; height: 32px;">
@@ -138,11 +138,38 @@
                 </div>
               </div>
 
+              <div v-if="stats.categories" class="card my-3 p-3 shadow-sm col-4 mr-2">
+                <h6 class="border-bottom border-gray pb-2"><b>Annotations Per Category</b></h6>
+                <div class="row" v-for="stat in Object.keys(stats.categories)">
+                  <strong class="col-8">{{stat}}:</strong>
+                  <span class="col-4">{{stats.categories[stat].toFixed(0)}}</span>
+                </div>
+              </div>
+
+              <div v-if="stats.images_per_category" class="card my-3 p-3 shadow-sm col-4 mr-2">
+                <h6 class="border-bottom border-gray pb-2"><b>Annotated Images Per Category</b></h6>
+                <div class="row" v-for="stat in Object.keys(stats.images_per_category)">
+                  <strong class="col-8">{{stat}}:</strong>
+                  <span class="col-4">{{stats.images_per_category[stat].toFixed(0)}}</span>
+                </div>
+              </div>
+
             </div>
             
           </div>
         </div>
-        <div class="container" v-show="tab == 'settings'">settings</div>
+        <div class="container" v-show="tab == 'settings'">
+          <div class="card my-3 p-3 shadow-sm mr-2">
+            <h6 class="border-bottom border-gray pb-2"><b>Metadata</b></h6>
+            
+            <button 
+              class="btn btn-sm btn-block btn-danger"
+              @click="resetMetadata"
+            >
+              Rest All Metadata
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>
@@ -252,6 +279,7 @@
         <PanelString name="Contains" v-model="query.file_name__icontains" @submit="updatePage" />
         <PanelToggle name="Show Annotated" v-model="panel.showAnnotated" />
         <PanelToggle name="Show Not Annotated" v-model="panel.showNotAnnotated" />
+        <PanelDropdown name="Order" v-model="order" :values="orderTypes" />
       </div>
     </div>
 
@@ -406,6 +434,7 @@ import ImageCard from "@/components/cards/ImageCard";
 import Pagination from "@/components/Pagination";
 import PanelString from "@/components/PanelInputString";
 import PanelToggle from "@/components/PanelToggle";
+import PanelDropdown from "@/components/PanelInputDropdown"
 import JQuery from "jquery";
 import TagsInput from "@/components/TagsInput";
 
@@ -420,6 +449,7 @@ export default {
     Pagination,
     PanelString,
     PanelToggle,
+    PanelDropdown,
     TagsInput
   },
   mixins: [toastrs],
@@ -450,7 +480,7 @@ export default {
       mouseDown: false,
       sidebar: {
         drag: false,
-        width: 300,
+        width: window.innerWidth * 0.2,
         canResize: false
       },
       scan: {
@@ -472,6 +502,12 @@ export default {
       },
       datasetExports: [],
       tab: "images",
+      order: "file_name",
+      orderTypes: {
+        file_name: "File Name",
+        id: "Id",
+        path: "File Path"
+      },
       query: {
         file_name__icontains: "",
         ...this.$route.query
@@ -502,7 +538,8 @@ export default {
         limit: this.limit,
         folder: this.folders.join("/"),
         ...this.query,
-        annotated: this.queryAnnotated
+        annotated: this.queryAnnotated,
+        order: this.order
       })
         .then(response => {
           let data = response.data;
@@ -511,8 +548,8 @@ export default {
           this.dataset = data.dataset;
           this.categories = data.categories;
 
-          this.imageCount = data.pagination.total;
-          this.pages = data.pagination.pages;
+          this.imageCount = data.total;
+          this.pages = data.pages;
 
           this.subdirectories = data.subdirectories;
           // this.scan.id = data.scanId;
@@ -537,6 +574,15 @@ export default {
       Dataset.getExports(this.dataset.id).then(response => {
         this.datasetExports = response.data;
       });
+    },
+    resetMetadata() {
+      let r = confirm("You can not undo reseting of all metadata in"
+        + "this dataset. This includes metadata of images"
+        + "and annotations.");
+      
+      if (r) {
+        Dataset.resetMetadata(this.dataset.id);
+      }
     },
     getStats() {
       Dataset.getStats(this.dataset.id).then(response => {
@@ -617,7 +663,8 @@ export default {
       if (this.sidebar.canResize) {
         event.preventDefault();
         let max = window.innerWidth * 0.5;
-        this.sidebar.width = Math.min(Math.max(event.x, 200), max);
+        this.sidebar.width = Math.min(Math.max(event.x, 150), max);
+        localStorage.setItem("dataset/sideWidth", this.sidebar.width)
       }
     },
     startDrag() {
@@ -684,6 +731,10 @@ export default {
       if (tab == "statistics") this.getStats();
       if (tab == "exports") this.getExports();
     },
+    order(order) {
+      localStorage.setItem("dataset/order", order);
+      this.updatePage();
+    },
     queryAnnotated() {
       this.updatePage();
     },
@@ -732,8 +783,13 @@ export default {
     this.updatePage();
   },
   created() {
-    this.sidebar.width = window.innerWidth * 0.2;
-    if (this.sidebar.width < 90) this.sidebar.width = 0;
+    let tab = localStorage.getItem("dataset/tab");
+    let order = localStorage.getItem("dataset/order");
+    let sideWidth = localStorage.getItem("dataset/sideWidth");
+    
+    if (sideWidth !== null) this.sidebar.width = parseInt(sideWidth);
+    if (tab !== null) this.tab = tab;
+    if (order !== null) this.order = order;
 
     this.dataset.id = parseInt(this.identifier);
     this.updatePage();
@@ -741,9 +797,6 @@ export default {
   mounted() {
     window.addEventListener("mouseup", this.stopDrag);
     window.addEventListener("mousedown", this.startDrag);
-
-    let tab = localStorage.getItem("dataset/tab");
-    if (tab !== null) this.tab = tab;
   },
   destroyed() {
     window.removeEventListener("mouseup", this.stopDrag);

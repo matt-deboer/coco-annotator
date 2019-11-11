@@ -11,9 +11,9 @@ from flask_login import current_user
 
 class AnnotationModel(DynamicDocument):
 
-    COCO_PROPERTIES = ["id", "image_id", "category_id", "segmentation", \
-                       "iscrowd", "color", "area", "bbox", "metadata", \
-                       "keypoints"]
+    COCO_PROPERTIES = ["id", "image_id", "category_id", "segmentation",
+                       "iscrowd", "color", "area", "bbox", "metadata",
+                       "keypoints", "isbbox"]
 
     id = SequenceField(primary_key=True)
     image_id = IntField(required=True)
@@ -24,13 +24,14 @@ class AnnotationModel(DynamicDocument):
     area = IntField(default=0)
     bbox = ListField(default=[0, 0, 0, 0])
     iscrowd = BooleanField(default=False)
+    isbbox = BooleanField(default=False)
 
     creator = StringField(required=True)
     width = IntField()
     height = IntField()
 
     color = StringField()
-    
+
     keypoints = ListField(default=[])
 
     metadata = DictField(default={})
@@ -42,9 +43,8 @@ class AnnotationModel(DynamicDocument):
     milliseconds = IntField(default=0)
     events = EmbeddedDocumentListField(Event)
 
-
     def __init__(self, image_id=None, **data):
-        
+
         from .images import ImageModel
 
         if image_id is not None:
@@ -60,7 +60,7 @@ class AnnotationModel(DynamicDocument):
 
     def save(self, copy=False, *args, **kwargs):
 
-        if not self.dataset_id and not copy:
+        if self.dataset_id and not copy:
             dataset = DatasetModel.objects(id=self.dataset_id).first()
 
             if dataset is not None:
@@ -113,7 +113,7 @@ class AnnotationModel(DynamicDocument):
         }
 
         return im.Annotation(**data)
-    
+
     def add_event(self, e):
         self.update(push__events=e)
 
