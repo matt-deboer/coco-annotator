@@ -92,9 +92,6 @@ class ImageModel(DynamicDocument):
         """
         Generates (if required) and returns thumbnail
         """
-        if not self.annotated:
-            self.thumbnail_delete()
-            return Image.open(self.path)
         
         thumbnail_path = self.thumbnail_path()
 

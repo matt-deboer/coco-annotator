@@ -101,6 +101,16 @@
           </div>
           <div class="modal-body">
             <form>
+              <div class="form-group">
+                <label>Supercategory</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  :value="supercategory"
+                  @input="supercategory = $event.target.value"
+                />
+              </div>
+
               <div class="form-group row">
                 <label class="col-sm-2 col-form-label">Color</label>
                 <div class="col-sm-9">
@@ -109,13 +119,12 @@
               </div>
 
               <div class="form-group">
-                <label>Keypoint Labels</label>
-                <TagsInput
-                  v-model="keypoint.labels"
+                <Keypoints
+                  v-model="keypoint"
                   element-id="keypointLabels"
                   :typeahead="true"
                   :typeahead-activation-threshold="0"
-                ></TagsInput>
+                ></Keypoints>
               </div>
             </form>
           </div>
@@ -139,11 +148,11 @@ import paper from "paper";
 
 import Annotations from "@/models/annotations";
 import Annotation from "@/components/annotator/Annotation";
-import TagsInput from "@/components/TagsInput";
+import Keypoints from "@/components/Keypoints";
 
 export default {
   name: "Category",
-  components: { Annotation, TagsInput },
+  components: { Annotation, Keypoints },
   props: {
     category: {
       type: Object,
@@ -189,6 +198,7 @@ export default {
   data: function() {
     return {
       group: null,
+      supercategory: this.category.supercategory,
       color: this.category.color,
       keypoint: {
         labels: this.category.keypoint_labels,
@@ -263,6 +273,7 @@ export default {
         color: this.color,
         metadata: [],
         annotations: [],
+        supercategory: this.supercategory,
         keypoint_labels: this.keypoint.labels,
         keypoint_edges: this.keypoint.edges
       };
