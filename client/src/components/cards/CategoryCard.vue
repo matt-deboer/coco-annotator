@@ -33,7 +33,6 @@
           >-->
           <button
             class="dropdown-item"
-            @click="onEditClick"
             data-toggle="modal"
             :data-target="'#categoryEdit' + category.id"
           >Edit</button>
@@ -46,7 +45,8 @@
       >Created by {{ category.creator }}</div>
     </div>
 
-    <div class="modal fade" role="dialog" :id="'categoryEdit' + category.id">
+    <div class="modal fade" role="dialog" ref="category_settings"
+        :id="'categoryEdit' + category.id" >
       <div class="modal-dialog" role="document">
         <div class="modal-content">
           <div class="modal-header">
@@ -61,8 +61,10 @@
                 <label>Name</label>
                 <input
                   type="text"
+                  :value="name"
+                  required="true"
                   class="form-control"
-                  :value="category.name"
+                  :class="{'is-invalid': name.length === 0}"
                   @input="name = $event.target.value"
                 />
               </div>
@@ -86,11 +88,10 @@
 
               <div class="form-group">
                 <Keypoints
+                  ref="keypoints"
                   v-model="keypoint"
                   element-id="keypoints"
                   placeholder="Add a keypoint"
-                  :typeahead="true"
-                  :typeahead-activation-threshold="0"
                 ></Keypoints>
               </div>
             </form>
@@ -100,6 +101,8 @@
               type="button"
               class="btn btn-success"
               @click="onUpdateClick"
+              :disabled="!isFormValid"
+              :class="{ disabled: !isFormValid }"
               data-dismiss="modal"
             >Update</button>
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -115,6 +118,9 @@ import axios from "axios";
 import toastrs from "@/mixins/toastrs";
 // import TagsInput from "@/components/TagsInput";
 import Keypoints from "@/components/Keypoints";
+import JQuery from "jquery";
+
+let $ = JQuery;
 
 export default {
   name: "CategoryCard",
@@ -130,7 +136,7 @@ export default {
         labels: [...this.category.keypoint_labels],
         edges: [...this.category.keypoint_edges]
       },
-      name: this.category.name,
+      name: this.category.name
     };
   },
   props: {
@@ -139,11 +145,21 @@ export default {
       required: true
     }
   },
+  computed: {
+    isFormValid() {
+      return (
+        this.name.length !== 0 &&
+        this.$refs &&
+        this.$refs.keypoints &&
+        this.$refs.keypoints.valid
+      );
+    }
+  },
   created() {
-    this.resetEditorFromProps();
+    this.resetCategorySettings();
   },
   methods: {
-    resetEditorFromProps() {
+    resetCategorySettings() {
       this.name = this.category.name;
       this.supercategory = this.category.supercategory;
       this.color = this.category.color;
@@ -151,9 +167,6 @@ export default {
         labels: [...this.category.keypoint_labels],
         edges: [...this.category.keypoint_edges]
       };
-    },
-    onEditClick() {
-      this.resetEditorFromProps();
     },
     onCardClick() {},
     onDownloadClick() {},
@@ -170,7 +183,7 @@ export default {
           supercategory: this.supercategory,
           metadata: this.metadata,
           keypoint_edges: this.keypoint.edges,
-          keypoint_labels: this.keypoint.labels,
+          keypoint_labels: this.keypoint.labels
         })
         .then(() => {
           this.axiosReqestSuccess(
@@ -180,7 +193,7 @@ export default {
           this.category.name = this.name;
           this.category.supercategory = this.supercategory;
           this.category.color = this.color;
-          this.category.metadata = {...this.metadata};
+          this.category.metadata = { ...this.metadata };
           this.category.keypoint_edges = [...this.keypoint.edges];
           this.category.keypoint_labels = [...this.keypoint.labels];
           this.$parent.updatePage();
@@ -193,6 +206,10 @@ export default {
           this.$parent.updatePage();
         });
     }
+  },
+  mounted() {
+    $(this.$refs.category_settings).on(
+      "hidden.bs.modal", this.resetCategorySettings);
   }
 };
 </script>

@@ -84,6 +84,7 @@
       class="modal fade"
       tabindex="-1"
       role="dialog"
+      ref="category_settings"
       :id="'categorySettings' + category.id"
     >
       <div class="modal-dialog" role="document">
@@ -119,16 +120,22 @@
               </div>
 
               <div class="form-group">
-                <Keypoints
+                <Keypoints ref="keypoints"
                   v-model="keypoint"
                   element-id="keypointLabels"
-                  :typeahead="true"
-                  :typeahead-activation-threshold="0"
                 ></Keypoints>
               </div>
             </form>
           </div>
           <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-success"
+              @click="onUpdateClick"
+              :disabled="!isFormValid"
+              :class="{ disabled: !isFormValid }"
+              data-dismiss="modal"
+            >Update</button>
             <button
               type="button"
               class="btn btn-secondary"
@@ -149,6 +156,9 @@ import paper from "paper";
 import Annotations from "@/models/annotations";
 import Annotation from "@/components/annotator/Annotation";
 import Keypoints from "@/components/Keypoints";
+import JQuery from "jquery";
+
+let $ = JQuery;
 
 export default {
   name: "Category",
@@ -201,8 +211,8 @@ export default {
       supercategory: this.category.supercategory,
       color: this.category.color,
       keypoint: {
-        labels: this.category.keypoint_labels,
-        edges: this.category.keypoint_edges
+        labels: [...this.category.keypoint_labels],
+        edges: [...this.category.keypoint_edges]
       },
       selectedAnnotation: -1,
       showAnnotations: false,
@@ -214,6 +224,14 @@ export default {
     show(index) {
       if (this.search.length === 0) return true;
       return this.filterFound.indexOf(index) > -1;
+    },
+    resetCategorySettings() {
+      this.supercategory = this.category.supercategory;
+      this.color = this.category.color;
+      this.keypoint = {
+        labels: [...this.category.keypoint_labels],
+        edges: [...this.category.keypoint_edges]
+      };
     },
     /**
      * Created
@@ -256,6 +274,11 @@ export default {
         }
       });
     },
+    onUpdateClick() {
+      this.category.keypoint_labels = [...this.keypoint.labels];
+      this.category.keypoint_edges = [...this.keypoint.edges];
+      this.category.supercategory = this.supercategory;
+    },
     /**
      * Exports data for send to backend
      * @returns {json} Annotation data, and settings
@@ -273,9 +296,9 @@ export default {
         color: this.color,
         metadata: [],
         annotations: [],
-        supercategory: this.supercategory,
-        keypoint_labels: this.keypoint.labels,
-        keypoint_edges: this.keypoint.edges
+        supercategory: this.category.supercategory,
+        keypoint_labels: this.category.keypoint_labels,
+        keypoint_edges: this.category.keypoint_edges
       };
 
       if (refs.hasOwnProperty("annotation")) {
@@ -434,6 +457,13 @@ export default {
       let l = Math.round(color.lightness * 50);
       let s = Math.round(color.saturation * 100);
       return "hsl(" + h + "," + s + "%," + l + "%)";
+    },
+    isFormValid() {
+      return (
+        this.$refs &&
+        this.$refs.keypoints &&
+        this.$refs.keypoints.valid
+      );
     }
   },
   watch: {
@@ -490,6 +520,8 @@ export default {
   },
   mounted() {
     this.initCategory();
+    $(this.$refs.category_settings).on(
+      "hidden.bs.modal", this.resetCategorySettings);
   }
 };
 </script>
