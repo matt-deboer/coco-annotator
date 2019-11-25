@@ -67,10 +67,13 @@
         :annotation="annotation"
         :current="current.annotation"
         @click="onAnnotationClick(listIndex)"
+        @keypoint-click="onKeypointClick(listIndex, $event)"
+        @keypoints-complete="$emit('keypoints-complete')"
         :opacity="opacity"
         :index="listIndex"
         :keypoint-edges="keypoint.edges"
         :keypoint-labels="keypoint.labels"
+        :keypoint-colors="keypoint.colors"
         ref="annotation"
         :hover="hover.annotation"
         :active-tool="activeTool"
@@ -212,12 +215,14 @@ export default {
       color: this.category.color,
       keypoint: {
         labels: [...this.category.keypoint_labels],
-        edges: [...this.category.keypoint_edges]
+        edges: [...this.category.keypoint_edges],
+        colors: [...this.category.keypoint_colors],
       },
       selectedAnnotation: -1,
       showAnnotations: false,
       isVisible: false,
-      search: ""
+      search: "",
+      isMounted: false,
     };
   },
   methods: {
@@ -230,7 +235,8 @@ export default {
       this.color = this.category.color;
       this.keypoint = {
         labels: [...this.category.keypoint_labels],
-        edges: [...this.category.keypoint_edges]
+        edges: [...this.category.keypoint_edges],
+        colors: [...this.category.keypoint_colors],
       };
     },
     /**
@@ -256,7 +262,8 @@ export default {
           this.$parent.selectLastEditorTool();
           this.$emit("click", {
             annotation: annotationId,
-            category: this.index
+            category: this.index,
+            keypoint: -1,
           });
         });
 
@@ -277,6 +284,7 @@ export default {
     onUpdateClick() {
       this.category.keypoint_labels = [...this.keypoint.labels];
       this.category.keypoint_edges = [...this.keypoint.edges];
+      this.category.keypoint_colors = [...this.keypoint.colors];
       this.category.supercategory = this.supercategory;
     },
     /**
@@ -298,7 +306,8 @@ export default {
         annotations: [],
         supercategory: this.category.supercategory,
         keypoint_labels: this.category.keypoint_labels,
-        keypoint_edges: this.category.keypoint_edges
+        keypoint_edges: this.category.keypoint_edges,
+        keypoint_colors: this.category.keypoint_colors,
       };
 
       if (refs.hasOwnProperty("annotation")) {
@@ -344,15 +353,34 @@ export default {
         if (this.isCurrent) {
           this.$emit("click", {
             annotation: this.selectedAnnotation,
-            category: this.index
+            category: this.index,
+            keypoint: -1,
           });
         }
     },
     /**
-     * Event handler for annotaiton click
+     * Event handler for keypoint click
+     */
+    onKeypointClick(annotation_index, keypoint_index) {
+      let indices = {
+        annotation: annotation_index,
+        category: this.index,
+        keypoint: keypoint_index,
+      };
+      this.selectedAnnotation = annotation_index;
+      this.showAnnotations = true;
+
+      this.$emit("click", indices);
+    },
+    /**
+     * Event handler for annotation click
      */
     onAnnotationClick(index) {
-      let indices = { annotation: index, category: this.index };
+      let indices = {
+        annotation: index,
+        category: this.index,
+        keypoint: -1 
+      };
       this.selectedAnnotation = index;
       this.showAnnotations = true;
 
@@ -364,7 +392,8 @@ export default {
     onClick() {
       let indices = {
         annotation: this.selectedAnnotation,
-        category: this.index
+        category: this.index,
+        keypoint: -1
       };
       this.$emit("click", indices);
 
@@ -416,7 +445,8 @@ export default {
 
       let indices = {
         annotation: this.selectedAnnotation,
-        category: this.index
+        category: this.index,
+        keypoint: -1,
       };
       this.$emit("click", indices);
 
@@ -460,6 +490,7 @@ export default {
     },
     isFormValid() {
       return (
+        this.isMounted &&
         this.$refs &&
         this.$refs.keypoints &&
         this.$refs.keypoints.valid
@@ -490,6 +521,7 @@ export default {
       if (!showing) {
         this.$emit("click", {
           annotation: -1,
+          keypoint: -1,
           category: this.index
         });
       }
@@ -522,6 +554,7 @@ export default {
     this.initCategory();
     $(this.$refs.category_settings).on(
       "hidden.bs.modal", this.resetCategorySettings);
+    this.isMounted = true;
   }
 };
 </script>

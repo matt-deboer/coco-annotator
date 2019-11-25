@@ -134,9 +134,11 @@ export default {
       metadata: [],
       keypoint: {
         labels: [...this.category.keypoint_labels],
-        edges: [...this.category.keypoint_edges]
+        edges: [...this.category.keypoint_edges],
+        colors: [...this.category.keypoint_colors],
       },
-      name: this.category.name
+      name: this.category.name,
+      isMounted: false,
     };
   },
   props: {
@@ -148,6 +150,7 @@ export default {
   computed: {
     isFormValid() {
       return (
+        this.isMounted &&
         this.name.length !== 0 &&
         this.$refs &&
         this.$refs.keypoints &&
@@ -165,7 +168,8 @@ export default {
       this.color = this.category.color;
       this.keypoint = {
         labels: [...this.category.keypoint_labels],
-        edges: [...this.category.keypoint_edges]
+        edges: [...this.category.keypoint_edges],
+        colors: [...this.category.keypoint_colors],
       };
     },
     onCardClick() {},
@@ -183,7 +187,8 @@ export default {
           supercategory: this.supercategory,
           metadata: this.metadata,
           keypoint_edges: this.keypoint.edges,
-          keypoint_labels: this.keypoint.labels
+          keypoint_labels: this.keypoint.labels,
+          keypoint_colors: this.keypoint.colors,
         })
         .then(() => {
           this.axiosReqestSuccess(
@@ -196,6 +201,7 @@ export default {
           this.category.metadata = { ...this.metadata };
           this.category.keypoint_edges = [...this.keypoint.edges];
           this.category.keypoint_labels = [...this.keypoint.labels];
+          this.category.keypoint_colors = [...this.keypoint.colors];
           this.$parent.updatePage();
         })
         .catch(error => {
@@ -210,6 +216,7 @@ export default {
   mounted() {
     $(this.$refs.category_settings).on(
       "hidden.bs.modal", this.resetCategorySettings);
+    this.isMounted = true;
   }
 };
 </script>
