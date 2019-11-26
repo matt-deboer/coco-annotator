@@ -14,6 +14,7 @@ import numpy as np
 import time
 import json
 import os
+import imantics as im
 
 from celery import shared_task
 from ..socket import create_socket
@@ -169,10 +170,14 @@ def import_annotations(task_id, dataset_id, coco_json):
             task.warning(
                 f"{category_name} category not found (creating a new one)")
 
+            keypoint_labels = category.get('keypoints', [])
+            keypoint_colors = [im.Color.random().hex for k in keypoint_labels]
+
             new_category = CategoryModel(
                 name=category_name,
                 keypoint_edges=category.get('skeleton', []),
-                keypoint_labels=category.get('keypoints', [])
+                keypoint_labels=keypoint_labels,
+                keypoint_colors=keypoint_colors
             )
             new_category.save()
 
