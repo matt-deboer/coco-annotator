@@ -175,6 +175,7 @@ def import_annotations(task_id, dataset_id, coco_json):
 
             new_category = CategoryModel(
                 name=category_name,
+                supercategory=category.get('supercategory', ''),
                 keypoint_edges=category.get('skeleton', []),
                 keypoint_labels=keypoint_labels,
                 keypoint_colors=keypoint_colors
